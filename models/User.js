@@ -21,12 +21,26 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      // Optional, not provided by Google
+      required: function() {
+        return this.authProvider === 'local';
+      },
     },
     authProvider: {
       type: String,
       enum: ['local', 'google'],
       default: 'local',
+    },
+    roles: {
+      type: [String],
+      default: ['registered_user'],
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isPremium: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

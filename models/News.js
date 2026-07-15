@@ -1,0 +1,99 @@
+import mongoose from 'mongoose';
+
+// Categories are now managed dynamically via the Category model
+
+const newsSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    content: {
+      type: String,
+      required: true,
+    },
+    subtitle: {
+      type: String,
+      trim: true,
+    },
+    readTime: {
+      type: Number,
+      default: 1, // Reading time in minutes
+    },
+    videoUrl: {
+      type: String,
+      default: '',
+    },
+    videoDuration: {
+      type: String,
+      default: '', // e.g., "02:15"
+    },
+    isPremiumContent: {
+      type: Boolean,
+      default: false,
+    },
+    category: {
+      type: String,
+      required: true,
+      lowercase: true,
+    },
+    author: {
+      type: String,
+      default: 'Anonymous',
+    },
+    imageUrl: {
+      type: String,
+      default: '',
+    },
+    isEditorPick: {
+      type: Boolean,
+      default: false,
+    },
+    isTrending: {
+      type: Boolean,
+      default: false,
+    },
+    views: {
+      type: Number,
+      default: 0,
+    },
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    likesCount: {
+      type: Number,
+      default: 0,
+    },
+    savedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    shares: {
+      type: Number,
+      default: 0,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    authorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
+    },
+  },
+  { timestamps: true }
+);
+
+const News = mongoose.model('News', newsSchema);
+export default News;

@@ -3,8 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getAuth } from 'firebase-admin/auth';
 
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const generateToken = (user) => {
+  return jwt.sign({ userId: user._id, roles: user.roles || (user.role ? [user.role] : []) }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
 export const register = async (req, res) => {
@@ -31,7 +31,7 @@ export const register = async (req, res) => {
       authProvider: 'local',
     });
 
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -40,12 +40,14 @@ export const register = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        roles: user.roles || (user.role ? [user.role] : []),
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
       },
       token,
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error', stack: error.stack });
   }
 };
 
@@ -62,6 +64,10 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (user.isActive === false) {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
+    }
+
     // Google-only users might not have a password
     if (!user.password) {
       return res.status(401).json({ error: 'Invalid login method for this account. Try Google Sign-In.' });
@@ -72,7 +78,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.json({
       message: 'Logged in successfully',
@@ -81,6 +87,8 @@ export const login = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        roles: user.roles || (user.role ? [user.role] : []),
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
       },
       token,
     });
@@ -108,6 +116,10 @@ export const googleSignIn = async (req, res) => {
 
     let user = await User.findOne({ email });
 
+    if (user && user.isActive === false) {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
+    }
+
     // If user doesn't exist, create them
     if (!user) {
       user = await User.create({
@@ -117,7 +129,7 @@ export const googleSignIn = async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.json({
       message: 'Google Sign-In successful',
@@ -126,6 +138,8 @@ export const googleSignIn = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        roles: user.roles || (user.role ? [user.role] : []),
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
       },
       token,
     });
@@ -133,4 +147,14 @@ export const googleSignIn = async (req, res) => {
     console.error('Google Sign-In error:', error);
     res.status(401).json({ error: 'Invalid or expired Google token' });
   }
+};
+
+export const logout = (req, res) => {
+  // Since we are using stateless JWTs (not stored in DB or cookies by the backend),
+  // true logout happens on the client side by deleting the token.
+  // We provide this endpoint to complete the API structure and allow future implementations
+  // like token blacklisting if needed.
+  res.status(200).json({
+    message: 'Logged out successfully. Please remove your auth token from local storage/cookies on the client side.'
+  });
 };
