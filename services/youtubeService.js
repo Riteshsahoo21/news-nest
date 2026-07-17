@@ -127,7 +127,7 @@ export const fetchAndSaveYouTubeNews = async () => {
         category: mappedCategory,
         reporter: snippet.channelTitle,
         duration: durationMap[videoId] || '02:00',
-        views: Math.floor(Math.random() * 50000) + 1000, // Mock views for demo
+        views: 0,
         isShort,
         isFeatured
       };
@@ -223,7 +223,7 @@ export const fetchAndSaveCategoryVideos = async (category) => {
         category: catName,
         reporter: snippet.channelTitle,
         duration: durationMap[videoId] || '05:00',
-        views: Math.floor(Math.random() * 50000) + 1000,
+        views: 0,
         isShort: false,
         isFeatured: false
       };

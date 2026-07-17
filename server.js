@@ -21,7 +21,17 @@ import searchRoutes from './routes/searchRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import stripeRoutes from './routes/stripeRoutes.js';
+import reporterApplicationRoutes from './routes/reporterApplicationRoutes.js';
+import newsletterRoutes from './routes/newsletterRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
+import adRoutes from './routes/adRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
+import { stripeWebhook } from './controllers/stripeController.js';
 import { initCronJobs } from './cron/newsFetcher.js';
+import { initNewsletterCron } from './cron/newsletterScheduler.js';
+import { initSubscriptionCron } from './cron/subscriptionScheduler.js';
 import { seedDefaultRoles } from './utils/seedRoles.js';
 
 // Initialize Firebase Admin SDK
@@ -89,6 +99,10 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors());
+
+// Stripe Webhook needs raw body, BEFORE express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
+
 app.use(express.json());
 
 // Attach io to req so controllers can use it
@@ -112,6 +126,13 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/stripe', stripeRoutes);
+app.use('/api/reporter-applications', reporterApplicationRoutes);
+app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/ads', adRoutes);
+app.use('/api/upload', uploadRoutes);
 
 app.get('/', (req, res) => {
   res.send('News Nests Backend API is running.');
@@ -134,6 +155,10 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   
-  // Initialize cron jobs
+  // Initialize Cron Jobs
   initCronJobs();
+  initNewsletterCron();
+  initSubscriptionCron();
+
+  // Error handling middleware
 });

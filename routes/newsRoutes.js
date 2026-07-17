@@ -6,6 +6,7 @@ import {
   getEditorPicks, 
   getTrendingNews, 
   updateNews, 
+  updateDraft,
   deleteNews,
   getNewsById,
   likeNews,
@@ -48,6 +49,7 @@ router.post('/article/:id/comments', verifyToken, addComment);
 // Protected CRUD routes
 // Reporters can create (submit) news. Editors and Admins can also create.
 router.post('/', verifyToken, authorizePermissions('create_content'), upload.single('image'), createNews);
+router.put('/draft/:id', verifyToken, authorizePermissions('create_content'), upload.single('image'), updateDraft);
 
 // Only admins/editors can update/delete arbitrarily.
 router.put('/:id', verifyToken, authorizePermissions('manage_content'), updateNews);

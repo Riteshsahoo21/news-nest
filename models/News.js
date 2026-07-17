@@ -80,8 +80,12 @@ const newsSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['draft', 'pending', 'approved', 'rejected', 'scheduled'],
       default: 'pending',
+    },
+    scheduledAt: {
+      type: Date,
+      default: null,
     },
     authorId: {
       type: mongoose.Schema.Types.ObjectId,

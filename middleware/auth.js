@@ -39,11 +39,19 @@ export const verifyToken = async (req, res, next) => {
 export const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     // req.user must be populated by verifyToken first
-    if (!req.user || !req.user.role) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'User information missing. Please authenticate.' });
+    }
+
+    const userRoles = req.user.roles || (req.user.role ? [req.user.role] : []);
+    
+    if (userRoles.length === 0) {
       return res.status(403).json({ error: 'Role information missing. Please authenticate.' });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const hasRole = userRoles.some(r => allowedRoles.includes(r));
+
+    if (!hasRole) {
       return res.status(403).json({ 
         error: `Access denied. Requires one of: ${allowedRoles.join(', ')}` 
       });
@@ -83,6 +91,17 @@ export const authorizePermissions = (...requiredPermissions) => {
           return res.status(403).json({ 
             error: `Access denied. Requires permission: ${requiredPermissions.join(' or ')}` 
           });
+        }
+
+        if (requiredPermissions.includes('create_content')) {
+          const isReporter = roles.includes('reporter');
+          const isAdminOrEditor = roles.includes('admin') || roles.includes('editor');
+          
+          if (isReporter && !isAdminOrEditor) {
+             if (!user.isPremium) {
+                return res.status(403).json({ error: 'Your premium subscription has expired. You must have an active plan to post content.' });
+             }
+          }
         }
       }
 

@@ -2,16 +2,28 @@ import News from '../models/News.js';
 import VideoNews from '../models/VideoNews.js';
 import PhotoGallery from '../models/PhotoGallery.js';
 import User from '../models/User.js';
+import Invoice from '../models/Invoice.js';
 
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     
+    let daysRemaining = null;
+    if (user.isPremium && user.subscriptionExpiry) {
+      const expiry = new Date(user.subscriptionExpiry);
+      const now = new Date(); // Secure Backend Clock
+      const diffTime = expiry - now;
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (daysRemaining < 0) daysRemaining = 0;
+    }
+    
     res.json({
       ...user.toObject(),
       allowedCategories: req.user.allowedCategories,
-      permissions: req.user.permissions || []
+      permissions: req.user.permissions || [],
+      daysRemaining,
+      cancelAtPeriodEnd: user.cancelAtPeriodEnd || false,
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -55,6 +67,32 @@ export const getMyBookmarks = async (req, res) => {
     res.json(allBookmarks);
   } catch (error) {
     console.error('Error fetching bookmarks:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const cancelPremium = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    // Set the flag to true so the user retains perks until the timer runs out
+    user.cancelAtPeriodEnd = true;
+    await user.save();
+    
+    res.json({ success: true, message: 'Your subscription has been cancelled. You will keep your perks until your plan expires.' });
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getMyInvoices = async (req, res) => {
+  try {
+    const invoices = await Invoice.find({ user: req.user.id }).sort({ date: -1 });
+    res.json(invoices);
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -1,12 +1,12 @@
 import express from 'express';
-import { getMyBookmarks, getMe } from '../controllers/userController.js';
+import { getMe, getMyBookmarks, cancelPremium, getMyInvoices } from '../controllers/userController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.use(verifyToken);
-
-router.get('/bookmarks', getMyBookmarks);
-router.get('/me', authorizePermissions(), getMe);
+router.get('/me', verifyToken, authorizePermissions(), getMe);
+router.get('/bookmarks', verifyToken, authorizePermissions(), getMyBookmarks);
+router.post('/cancel-premium', verifyToken, authorizePermissions(), cancelPremium);
+router.get('/invoices', verifyToken, getMyInvoices);
 
 export default router;

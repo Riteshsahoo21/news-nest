@@ -42,6 +42,17 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    subscriptionPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SubscriptionPlan',
+    },
+    subscriptionExpiry: {
+      type: Date,
+    },
+    cancelAtPeriodEnd: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

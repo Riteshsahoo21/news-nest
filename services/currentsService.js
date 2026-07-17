@@ -39,7 +39,7 @@ export const fetchAndSaveCurrentsNews = async () => {
               isEditorPick: false,
               isTrending: true, 
               readTime: Math.max(1, Math.ceil((article.description?.length || 500) / 1000)),
-              views: Math.floor(Math.random() * 5000), // Ensures mixed categories on home page
+              views: 0,
             };
 
             const updated = await News.findOneAndUpdate(

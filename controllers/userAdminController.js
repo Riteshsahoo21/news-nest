@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Role from '../models/Role.js';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
+import EditorDetail from '../models/EditorDetail.js';
 
 // Get all users (Admin only)
 export const getAllUsers = async (req, res) => {
@@ -36,10 +37,21 @@ export const updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
     // We can accept 'role' for backwards compatibility, but prefer 'roles'
-    const roles = req.body.roles || (req.body.role ? [req.body.role] : []);
+    const requestedRoles = req.body.roles || (req.body.role ? [req.body.role] : []);
     
-    if (roles.length === 0) {
+    if (requestedRoles.length === 0) {
       return res.status(400).json({ error: 'At least one role must be provided' });
+    }
+    
+    // Handle pseudo-role for 'Registered Premium'
+    let isPremium = undefined;
+    let roles = [...requestedRoles];
+    
+    if (roles.includes('registered_premium')) {
+      roles = ['registered_user'];
+      isPremium = true;
+    } else if (roles.includes('registered_user')) {
+      isPremium = false; // Revoke premium if explicitly set back to registered_user
     }
     
     // Validate roles dynamically
@@ -56,10 +68,16 @@ export const updateUserRole = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
+    // Construct update payload
+    const updatePayload = { roles, role: roles[0] };
+    if (isPremium !== undefined) {
+      updatePayload.isPremium = isPremium;
+    }
+
     // Use findByIdAndUpdate to bypass validation of other fields (like missing fullName in legacy records)
-    await User.findByIdAndUpdate(id, { roles, role: roles[0] }, { runValidators: false });
+    await User.findByIdAndUpdate(id, updatePayload, { runValidators: false });
     
-    res.json({ message: 'User roles updated successfully', user: { id: targetUser._id, roles } });
+    res.json({ message: 'User roles updated successfully', user: { id: targetUser._id, roles, isPremium } });
   } catch (error) {
     console.error('Error updating user role:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -158,6 +176,77 @@ export const addStaff = async (req, res) => {
 
   } catch (error) {
     console.error('Error adding staff:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const addEditor = async (req, res) => {
+  try {
+    const { 
+      fullName, email, password, phoneNumber, dateOfBirth, gender, idType,
+      addressLine1, addressLine2, city, state, zipCode, country,
+      emergencyContactName, emergencyContactPhone, linkedInUrl, twitterUrl
+    } = req.body;
+
+    if (!fullName || !email || !password || !phoneNumber || !dateOfBirth || !gender || !idType || 
+        !addressLine1 || !city || !state || !zipCode || !country || !emergencyContactName || !emergencyContactPhone) {
+      return res.status(400).json({ error: 'All required fields must be provided' });
+    }
+
+    if (!req.files || !req.files.photo || !req.files.idDocument) {
+      return res.status(400).json({ error: 'Photo and ID Document are required' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = await User.create({
+      fullName,
+      email,
+      mobileNumber: phoneNumber,
+      password: hashedPassword,
+      roles: ['editor'],
+      role: 'editor',
+      authProvider: 'local'
+    });
+
+    await EditorDetail.create({
+      userId: newUser._id,
+      phoneNumber,
+      dateOfBirth,
+      gender,
+      idType,
+      photoUrl: req.files.photo[0].path,
+      idDocumentUrl: req.files.idDocument[0].path,
+      addressLine1,
+      addressLine2: addressLine2 || '',
+      city,
+      state,
+      zipCode,
+      country,
+      emergencyContactName,
+      emergencyContactPhone,
+      linkedInUrl: linkedInUrl || '',
+      twitterUrl: twitterUrl || ''
+    });
+
+    res.status(201).json({
+      message: 'Editor created successfully',
+      user: {
+        id: newUser._id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        role: newUser.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding editor:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

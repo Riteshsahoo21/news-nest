@@ -100,7 +100,7 @@ export const getNewsByCategory = async (req, res) => {
 // Create a news article
 export const createNews = async (req, res) => {
   try {
-    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration } = req.body;
+    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt } = req.body;
     
     // Get image URL from Cloudinary if a file was uploaded
     let imageUrl = req.body.imageUrl || '';
@@ -121,6 +121,17 @@ export const createNews = async (req, res) => {
     const permissions = req.user.permissions || [];
     const canAutoApprove = permissions.includes('approve_content') || permissions.includes('manage_content');
 
+    let initialStatus = 'pending';
+    let finalScheduledAt = scheduledAt ? new Date(scheduledAt) : null;
+
+    if (action === 'draft') {
+      initialStatus = 'draft';
+    } else if (action === 'schedule') {
+      initialStatus = canAutoApprove ? 'scheduled' : 'pending';
+    } else {
+      initialStatus = canAutoApprove ? 'approved' : 'pending';
+    }
+
     const newsArticle = await News.create({
       title,
       content,
@@ -134,7 +145,8 @@ export const createNews = async (req, res) => {
       readTime: readTime || 1,
       videoUrl,
       videoDuration,
-      status: canAutoApprove ? 'approved' : 'pending',
+      status: initialStatus,
+      scheduledAt: finalScheduledAt,
     });
 
     res.status(201).json({
@@ -152,7 +164,7 @@ export const createNews = async (req, res) => {
   }
 };
 
-// Update a news article
+// Update a news article (Admin/Editor)
 export const updateNews = async (req, res) => {
   try {
     const { id } = req.params;
@@ -173,6 +185,46 @@ export const updateNews = async (req, res) => {
     if (error.name === 'ValidationError') {
       return res.status(400).json({ error: 'Invalid category or fields' });
     }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Update a draft article (Reporter)
+export const updateDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt } = req.body;
+
+    const article = await News.findById(id);
+    if (!article) return res.status(404).json({ error: 'Article not found' });
+
+    if (article.authorId.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'You can only edit your own articles' });
+    }
+
+    if (!['draft', 'rejected', 'pending'].includes(article.status)) {
+      return res.status(400).json({ error: 'Cannot edit an approved or scheduled article directly' });
+    }
+
+    const updates = { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration };
+    if (req.file && req.file.path) updates.imageUrl = req.file.path;
+    if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
+
+    const permissions = req.user.permissions || [];
+    const canAutoApprove = permissions.includes('approve_content') || permissions.includes('manage_content');
+
+    if (action === 'draft') {
+      updates.status = 'draft';
+    } else if (action === 'schedule') {
+      updates.status = canAutoApprove ? 'scheduled' : 'pending';
+    } else if (action === 'submit') {
+      updates.status = canAutoApprove ? 'approved' : 'pending';
+    }
+
+    const updatedArticle = await News.findByIdAndUpdate(id, updates, { new: true });
+    res.json({ message: 'Draft updated', article: updatedArticle });
+  } catch (error) {
+    console.error('Error updating draft:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -346,7 +398,12 @@ export const approveNews = async (req, res) => {
       return res.status(403).json({ error: `You are not authorized to approve posts in this category.` });
     }
 
-    news.status = 'approved';
+    if (news.scheduledAt && new Date(news.scheduledAt) > new Date()) {
+      news.status = 'scheduled';
+    } else {
+      news.status = 'approved';
+    }
+    
     news.rejectionReason = '';
     await news.save();
     
