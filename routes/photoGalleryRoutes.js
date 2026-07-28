@@ -14,6 +14,7 @@ import {
   addComment
 } from '../controllers/photoGalleryController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
+import { commentLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
@@ -44,6 +45,6 @@ router.delete('/:id', verifyToken, authorizePermissions('delete_content'), delet
 // Authenticated routes
 router.put('/:id/save', verifyToken, savePhotoGallery);
 router.post('/:id/like', verifyToken, likeGallery);
-router.post('/:id/comments', verifyToken, addComment);
+router.post('/:id/comments', verifyToken, commentLimiter, addComment);
 
 export default router;

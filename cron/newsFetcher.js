@@ -3,16 +3,32 @@ import { fetchAndSaveCurrentsNews } from '../services/currentsService.js';
 import { fetchAndSaveYouTubeNews } from '../services/youtubeService.js';
 import News from '../models/News.js';
 
-// Schedule the cron job to run every hour (at minute 0)
-// This translates to 24 requests per day, well within the 100 limit.
+// Schedule Currents API to run every hour
 export const initCronJobs = () => {
   cron.schedule('0 * * * *', async () => {
-    console.log('Running scheduled news fetch job from Currents API & YouTube API...');
+    console.log('Running scheduled news fetch job from Currents API...');
     await fetchAndSaveCurrentsNews();
-    await fetchAndSaveYouTubeNews();
   });
 
-  console.log('Cron jobs initialized: News fetchers scheduled every hour.');
+  // Schedule YouTube API to run every 6 hours to respect the 100 requests/day limit safely
+  // 8 categories + 2 generic searches = 10 requests per run * 4 runs/day = 40 requests/day.
+  cron.schedule('0 */6 * * *', async () => {
+    console.log('Running scheduled YouTube video fetch job for all categories...');
+    try {
+      await fetchAndSaveYouTubeNews();
+      
+      const categoriesToFetch = ['Politics', 'Sports', 'Technology', 'Business', 'Entertainment', 'Health', 'Science', 'Lifestyle'];
+      for (const category of categoriesToFetch) {
+         await fetchAndSaveCategoryVideos(category);
+         // Add a small delay between requests to avoid rate limit spikes
+         await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (err) {
+      console.error('Scheduled YouTube fetch failed:', err.message);
+    }
+  });
+
+  console.log('Cron jobs initialized: Currents (1h), YouTube (6h).');
   
   // Job to publish scheduled posts every minute
   cron.schedule('* * * * *', async () => {
@@ -31,9 +47,9 @@ export const initCronJobs = () => {
     }
   });
 
-  // Run it immediately on startup
-  setTimeout(() => {
+  // Run it immediately on startup (Currents API ONLY)
+  // We DO NOT run YouTube API on startup to prevent nodemon restarts from burning the 100 searches/day quota.
+  setTimeout(async () => {
     fetchAndSaveCurrentsNews();
-    fetchAndSaveYouTubeNews();
   }, 5000); 
 };

@@ -3,8 +3,8 @@ import News from '../models/News.js';
 import { sendEmailBlast } from '../controllers/newsletterController.js';
 
 export const initNewsletterCron = () => {
-  // Schedule to run every day at 16:28
-  cron.schedule('28 16 * * *', async () => {
+  // Schedule to run every day at 17:56
+  cron.schedule('56 17 * * *', async () => {
     try {
       console.log('Running automated newsletter digest job...');
       
@@ -90,5 +90,5 @@ export const initNewsletterCron = () => {
     }
   });
 
-  console.log('Newsletter cron initialized: Daily digest scheduled for 16:28.');
+  console.log('Newsletter cron initialized: Daily digest scheduled for 17:56.');
 };

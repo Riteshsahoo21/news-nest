@@ -11,32 +11,36 @@ export const fetchAndSaveYouTubeNews = async () => {
 
     console.log('Fetching YouTube News...');
 
-    // 1. Fetch Regular (Medium/Long) Official News
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // 1. Fetch Regular (Medium/Long) Official News (English & Hindi)
     const regularSearchRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
       params: {
         part: 'snippet',
-        q: 'official breaking news | CNN | BBC | Reuters | NDTV | India Today | WION',
+        q: 'breaking news (CNN | BBC | NDTV | India Today | Aaj Tak | ABP News | Zee News)',
         type: 'video',
+        videoCategoryId: '25', // Strictly News & Politics
         videoDuration: 'medium', // > 4 mins
         maxResults: 10,
-        order: 'date',
+        order: 'relevance', // relevance filters out recent spam better than 'date'
+        publishedAfter: oneDayAgo,
         regionCode: 'IN',
-        relevanceLanguage: 'en',
         key: apiKey,
       }
     });
 
-    // 2. Fetch News Shorts
+    // 2. Fetch News Shorts (English & Hindi)
     const shortsSearchRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
       params: {
         part: 'snippet',
-        q: 'breaking news shorts | CNN | BBC | Reuters | NDTV | India Today | WION',
+        q: '#shorts breaking news (CNN | NDTV | Aaj Tak | ABP News)',
         type: 'video',
+        videoCategoryId: '25',
         videoDuration: 'short', // < 4 mins (usually < 1m)
         maxResults: 10,
-        order: 'date',
+        order: 'relevance',
+        publishedAfter: oneDayAgo,
         regionCode: 'IN',
-        relevanceLanguage: 'en',
         key: apiKey,
       }
     });
@@ -155,25 +159,43 @@ export const fetchAndSaveCategoryVideos = async (category) => {
     if (!apiKey) return;
 
     console.log(`Fetching YouTube News for category: ${category}...`);
-    let q = 'official breaking news';
+    
+    // Niche categories need a wider net (7 days) because they don't have breaking news daily
+    const isNiche = ['science', 'health', 'technology', 'lifestyle', 'entertainment'].includes(category?.toLowerCase());
+    
+    const timeWindowMs = isNiche ? (7 * 24 * 60 * 60 * 1000) : (48 * 60 * 60 * 1000);
+    const publishedAfter = new Date(Date.now() - timeWindowMs).toISOString();
+    
+    let q = 'breaking news (NDTV | Aaj Tak | CNN)';
     if (category && category.toLowerCase() !== 'latest' && category.toLowerCase() !== 'trending') {
-      q = `official ${category} news | CNN | BBC | Reuters | NDTV | India Today | WION`;
-    } else {
-      q = 'official breaking news | CNN | BBC | Reuters | NDTV | India Today | WION';
+      if (isNiche) {
+        // Broaden search for niche topics, don't restrict to strict political news networks
+        q = `latest ${category} news`;
+      } else {
+        // Keep strict channel filters for hard news (Politics, World, Business)
+        q = `${category} news (CNN | BBC | NDTV | India Today | Aaj Tak | Zee News)`;
+      }
+    }
+
+    const searchParams = {
+      part: 'snippet',
+      q: q,
+      type: 'video',
+      videoDuration: 'medium', // > 4 mins
+      maxResults: 10,
+      order: 'relevance',
+      publishedAfter: publishedAfter,
+      regionCode: 'IN',
+      key: apiKey,
+    };
+
+    // Only force 'News & Politics' category for hard news, otherwise it blocks Science/Tech videos
+    if (!isNiche) {
+       searchParams.videoCategoryId = '25';
     }
 
     const regularSearchRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-      params: {
-        part: 'snippet',
-        q: q,
-        type: 'video',
-        videoDuration: 'medium', // > 4 mins
-        maxResults: 10,
-        order: 'date',
-        regionCode: 'IN',
-        relevanceLanguage: 'en',
-        key: apiKey,
-      }
+      params: searchParams
     });
 
     const allItems = regularSearchRes.data?.items || [];

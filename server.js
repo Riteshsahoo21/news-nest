@@ -28,6 +28,7 @@ import newsletterRoutes from './routes/newsletterRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import adRoutes from './routes/adRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import revenueRoutes from './routes/revenueRoutes.js';
 import { stripeWebhook } from './controllers/stripeController.js';
 import { initCronJobs } from './cron/newsFetcher.js';
 import { initNewsletterCron } from './cron/newsletterScheduler.js';
@@ -133,6 +134,7 @@ app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/ads', adRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/revenue', revenueRoutes);
 
 app.get('/', (req, res) => {
   res.send('News Nests Backend API is running.');

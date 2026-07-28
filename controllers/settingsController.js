@@ -18,7 +18,7 @@ export const getSettings = async (req, res) => {
 
 export const updateSettings = async (req, res) => {
   try {
-    const { newsletterEnabled, newsletterFrequency } = req.body;
+    const { newsletterEnabled, newsletterFrequency, adPriority, adsenseClientId } = req.body;
     
     let settings = await Settings.findOne({ isGlobal: true });
     if (!settings) {
@@ -27,6 +27,8 @@ export const updateSettings = async (req, res) => {
 
     if (newsletterEnabled !== undefined) settings.newsletterEnabled = newsletterEnabled;
     if (newsletterFrequency !== undefined) settings.newsletterFrequency = newsletterFrequency;
+    if (adPriority !== undefined) settings.adPriority = adPriority;
+    if (adsenseClientId !== undefined) settings.adsenseClientId = adsenseClientId;
 
     await settings.save();
     res.json(settings);

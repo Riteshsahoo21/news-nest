@@ -64,6 +64,11 @@ const videoNewsSchema = new mongoose.Schema(
     isFeatured: {
       type: Boolean,
       default: false,
+    },
+    commentSettings: {
+      type: String,
+      enum: ['all', 'staff_only', 'off'],
+      default: 'all',
     }
   },
   { timestamps: true }

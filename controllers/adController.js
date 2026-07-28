@@ -64,17 +64,31 @@ export const getRandomAd = async (req, res) => {
       return res.status(400).json({ error: 'Position query parameter is required' });
     }
 
-    const ads = await Advertisement.find({ 
-      position: { $in: [position, 'everywhere'] }, 
-      isActive: true 
-    });
+    let query = { isActive: true };
+    if (position === 'video_interstitial') {
+      // Allow explicitly positioned ads OR any active ad that has a valid videoUrl
+      query.$or = [
+        { position: { $in: [position, 'everywhere'] } },
+        { videoUrl: { $exists: true, $nin: [null, ''] } }
+      ];
+    } else {
+      query.position = { $in: [position, 'everywhere'] };
+    }
+
+    const ads = await Advertisement.find(query);
     
     if (ads.length === 0) {
       return res.json(null);
     }
 
-    // Pick a random ad from the available active ads for this position
-    const randomAd = ads[Math.floor(Math.random() * ads.length)];
+    // Find the minimum view count among the active ads
+    const minViews = Math.min(...ads.map(ad => ad.views || 0));
+    
+    // Filter the ads to only those that have the minimum views
+    const lowestViewAds = ads.filter(ad => (ad.views || 0) === minViews);
+
+    // Pick a random ad from those with the minimum views to shuffle them equally
+    const randomAd = lowestViewAds[Math.floor(Math.random() * lowestViewAds.length)];
     res.json(randomAd);
   } catch (error) {
     console.error('Error fetching random ad:', error);

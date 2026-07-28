@@ -8,14 +8,24 @@ let transporter = null;
 // Initialize Nodemailer. If SMTP is not provided, use Ethereal (mock).
 const initTransporter = async () => {
   if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT || 587,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const isGmail = process.env.SMTP_HOST.includes('gmail');
+    const transportConfig = isGmail 
+      ? {
+          service: 'gmail',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        }
+      : {
+          host: process.env.SMTP_HOST,
+          port: process.env.SMTP_PORT || 587,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        };
+    transporter = nodemailer.createTransport(transportConfig);
   } else {
     // Generate test SMTP service account from ethereal.email
     const testAccount = await nodemailer.createTestAccount();

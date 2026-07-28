@@ -96,3 +96,49 @@ export const getMyInvoices = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, mobileNumber, bio, location, socialLinks, profilePicture } = req.body;
+    
+    // Find user and update
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    // Update allowed fields
+    if (fullName !== undefined) user.fullName = fullName;
+    if (mobileNumber !== undefined) user.mobileNumber = mobileNumber;
+    if (bio !== undefined) user.bio = bio;
+    if (location !== undefined) user.location = location;
+    if (profilePicture !== undefined) user.profilePicture = profilePicture;
+    if (socialLinks !== undefined) {
+      user.socialLinks = {
+        ...user.socialLinks,
+        ...socialLinks
+      };
+    }
+    
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        mobileNumber: user.mobileNumber,
+        bio: user.bio,
+        location: user.location,
+        profilePicture: user.profilePicture,
+        socialLinks: user.socialLinks,
+        roles: user.roles || (user.role ? [user.role] : []),
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
+        isPremium: user.isPremium
+      }
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardStats } from '../controllers/adminController.js';
+import { getDashboardStats, getAuditLogs, getAuditLogStats } from '../controllers/adminController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,5 +13,15 @@ router.use(authorizePermissions('view_admin_panel'));
 // @desc    Get statistics for the admin dashboard
 // @access  Private/Admin
 router.get('/dashboard', getDashboardStats);
+
+// @route   GET /api/admin/audit-logs
+// @desc    Get system audit logs
+// @access  Private/Admin
+router.get('/audit-logs', getAuditLogs);
+
+// @route   GET /api/admin/audit-logs/stats
+// @desc    Get system audit log stats
+// @access  Private/Admin
+router.get('/audit-logs/stats', getAuditLogStats);
 
 export default router;

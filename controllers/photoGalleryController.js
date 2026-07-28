@@ -261,7 +261,7 @@ export const likeGallery = async (req, res) => {
 export const addComment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    const { content, parentCommentId } = req.body;
     const userId = req.user.id;
 
     if (!content) {
@@ -272,6 +272,7 @@ export const addComment = async (req, res) => {
       galleryId: id,
       userId,
       content,
+      parentCommentId: parentCommentId || null,
     });
 
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'fullName');

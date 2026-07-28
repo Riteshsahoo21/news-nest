@@ -22,15 +22,6 @@ export const getAllVideos = async (req, res) => {
 
     const sortObj = getSortObject(req.query.sort);
     let videos = await VideoNews.find(filter).sort(sortObj);
-    
-    // If it's a specific category and we have very few videos, try to fetch more
-    if (category && category.toLowerCase() !== 'latest' && category.toLowerCase() !== 'trending') {
-       if (videos.length < 5 && !isShort && !isFeatured) {
-          await fetchAndSaveCategoryVideos(category);
-          // Re-query after fetch
-          videos = await VideoNews.find(filter).sort(sortObj);
-       }
-    }
 
     res.json(videos);
   } catch (error) {
@@ -57,7 +48,7 @@ export const getVideoById = async (req, res) => {
 
     // Fetch associated approved comments
     const comments = await Comment.find({ videoId: id, isApproved: true })
-      .populate('userId', 'name profilePicture')
+      .populate('userId', 'fullName profilePicture')
       .sort({ createdAt: -1 });
 
     res.json({ video, comments });
@@ -139,7 +130,7 @@ export const incrementDownload = async (req, res) => {
 export const addComment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    const { content, parentCommentId } = req.body;
     const userId = req.user.id;
 
     if (!content) {
@@ -153,7 +144,11 @@ export const addComment = async (req, res) => {
       videoId: id,
       userId,
       content,
+      parentCommentId: parentCommentId || null,
     });
+
+    // Populate user details so the frontend can display the user's name immediately without refreshing
+    await newComment.populate('userId', 'fullName profilePicture');
 
     res.status(201).json({ message: 'Comment added successfully', comment: newComment });
   } catch (error) {

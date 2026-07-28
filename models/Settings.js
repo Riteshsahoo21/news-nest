@@ -19,6 +19,15 @@ const settingsSchema = new mongoose.Schema({
   lastAutomatedBlast: {
     type: Date,
     default: null
+  },
+  adPriority: {
+    type: String,
+    enum: ['adsense_first', 'custom_first'],
+    default: 'adsense_first'
+  },
+  adsenseClientId: {
+    type: String,
+    default: 'ca-pub-xxxxxxxxxxxxxx'
   }
 }, { timestamps: true });
 

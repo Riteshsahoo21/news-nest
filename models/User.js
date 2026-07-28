@@ -19,6 +19,24 @@ const userSchema = new mongoose.Schema(
       trim: true,
       // Optional, not provided by Google
     },
+    bio: {
+      type: String,
+      trim: true,
+      maxLength: 500,
+    },
+    profilePicture: {
+      type: String,
+      default: 'https://ui-avatars.com/api/?name=User&background=random',
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    socialLinks: {
+      twitter: { type: String, trim: true },
+      linkedin: { type: String, trim: true },
+      website: { type: String, trim: true },
+    },
     password: {
       type: String,
       required: function() {

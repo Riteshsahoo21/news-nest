@@ -11,6 +11,7 @@ import {
   deleteVideo
 } from '../controllers/videoNewsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
+import { commentLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.post('/:id/download', incrementDownload);
 // Protected user routes
 router.post('/:id/like', verifyToken, likeVideo);
 router.post('/:id/save', verifyToken, saveVideo);
-router.post('/:id/comments', verifyToken, addComment);
+router.post('/:id/comments', verifyToken, commentLimiter, addComment);
 
 // Admin only routes
 router.post('/', verifyToken, authorizePermissions('create_content'), createVideo);

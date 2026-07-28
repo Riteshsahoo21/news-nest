@@ -1,25 +1,18 @@
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-dotenv.config();
 
-const run = async () => {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/news-nests');
-  
-  const userSchema = new mongoose.Schema({}, { strict: false });
-  const User = mongoose.model('User', userSchema);
-  
-  const user = await User.findOne({ email: 'dfnokh1@gmail.com' });
-  if (user) {
-    console.log('User Details:', {
-      isPremium: user.isPremium,
-      subscriptionPlanId: user.subscriptionPlanId,
-      cancelAtPeriodEnd: user.cancelAtPeriodEnd,
-      subscriptionExpiry: user.subscriptionExpiry
-    });
-  } else {
-    console.log('User not found.');
-  }
-  process.exit(0);
-};
+mongoose.connect('mongodb://localhost:27017/news-nests-db')
+  .then(async () => {
+    const settings = await mongoose.connection.collection('settings').find({}).toArray();
+    console.log('Total settings documents:', settings.length);
+    console.log(settings);
 
-run();
+    const ads = await mongoose.connection.collection('advertisements').find({ isActive: true }).toArray();
+    console.log('Active ads count:', ads.length);
+    ads.forEach(ad => console.log('Ad:', ad.title, ad.position, ad.isActive));
+    
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error(err);
+    process.exit(1);
+  });

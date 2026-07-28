@@ -95,6 +95,11 @@ const newsSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    commentSettings: {
+      type: String,
+      enum: ['all', 'staff_only', 'off'],
+      default: 'all',
+    }
   },
   { timestamps: true }
 );

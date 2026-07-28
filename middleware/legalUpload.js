@@ -16,21 +16,14 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
-    // Determine format based on mimetype or originalname
-    let format = file.mimetype.split('/')[1];
-    if (file.originalname.toLowerCase().endsWith('.pdf')) {
-      format = 'pdf';
-    }
-    
-    // Cloudinary needs resource_type: 'raw' or 'auto' for PDFs, but for images it can be 'image'.
-    // If it's a pdf, we set format to pdf. For images, we let it be jpg/png.
+    // Cloudinary needs resource_type: 'raw' for PDFs to avoid security blocks on image conversion
     const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
     
     return {
       folder: 'reporter_applications',
-      format: isPdf ? 'pdf' : undefined,
+      format: isPdf ? undefined : file.mimetype.split('/')[1], // undefined for raw resources
       allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'pdf'],
-      resource_type: 'auto', // Important for PDFs
+      resource_type: isPdf ? 'raw' : 'auto', 
     };
   },
 });

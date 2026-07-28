@@ -40,6 +40,7 @@ export const createCheckoutSession = async (req, res) => {
       success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-cancel`,
       client_reference_id: userId.toString(),
+      allow_promotion_codes: true,
       metadata: {
         userId: userId.toString(),
         planId: planId.toString(),
@@ -192,3 +193,57 @@ export const verifySession = async (req, res) => {
   }
 };
 
+export const createCoupon = async (req, res) => {
+  try {
+    const { name, code, percentOff, amountOff, currency, duration, durationInMonths } = req.body;
+
+    // 1. Create the base Coupon
+    const couponConfig = {
+      name,
+      duration: duration || 'once',
+    };
+    if (percentOff) {
+      couponConfig.percent_off = percentOff;
+    } else if (amountOff) {
+      couponConfig.amount_off = amountOff;
+      couponConfig.currency = currency || 'inr';
+    }
+    if (duration === 'repeating' && durationInMonths) {
+      couponConfig.duration_in_months = durationInMonths;
+    }
+    
+    const coupon = await stripe.coupons.create(couponConfig);
+
+    // 2. Create the Promotion Code (the actual text the user types)
+    const promotionCode = await stripe.promotionCodes.create({
+      promotion: { type: 'coupon', coupon: coupon.id },
+      code: code.toUpperCase()
+    });
+
+    res.status(201).json({ coupon, promotionCode });
+  } catch (error) {
+    console.error('Error creating coupon:', error);
+    res.status(500).json({ error: error.message || 'Failed to create coupon' });
+  }
+};
+
+export const getCoupons = async (req, res) => {
+  try {
+    const promotionCodes = await stripe.promotionCodes.list({ active: true, limit: 100, expand: ['data.promotion.coupon'] });
+    res.json(promotionCodes.data);
+  } catch (error) {
+    console.error('Error fetching coupons:', error);
+    res.status(500).json({ error: 'Failed to fetch coupons' });
+  }
+};
+
+export const deleteCoupon = async (req, res) => {
+  try {
+    const { id } = req.params; // This is the coupon ID
+    await stripe.coupons.del(id);
+    res.json({ success: true, message: 'Coupon deleted' });
+  } catch (error) {
+    console.error('Error deleting coupon:', error);
+    res.status(500).json({ error: 'Failed to delete coupon' });
+  }
+};

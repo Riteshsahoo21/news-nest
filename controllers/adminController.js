@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import News from '../models/News.js';
 import Comment from '../models/Comment.js';
+import AuditLog from '../models/AuditLog.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -91,6 +92,81 @@ export const getDashboardStats = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};
+
+export const getAuditLogStats = async (req, res) => {
+  try {
+    const total = await AuditLog.countDocuments();
+    const successful = await AuditLog.countDocuments({ status: { $lt: 400 } });
+    const failed = await AuditLog.countDocuments({ status: { $gte: 400, $lt: 500 } });
+    const critical = await AuditLog.countDocuments({ severity: 'critical' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total,
+        successful,
+        failed,
+        critical
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching audit log stats:', error);
+    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};
+
+export const getAuditLogs = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search, severity, status, action } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query object
+    let query = {};
+
+    if (search) {
+      query.$or = [
+        { action: { $regex: search, $options: 'i' } },
+        { readableAction: { $regex: search, $options: 'i' } },
+        { endpoint: { $regex: search, $options: 'i' } },
+        { ipAddress: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (severity && severity !== 'all') {
+      query.severity = severity;
+    }
+
+    if (action && action !== 'all') {
+      query.action = { $regex: action, $options: 'i' };
+    }
+
+    if (status && status !== 'all') {
+      if (status === 'success') query.status = { $lt: 400 };
+      if (status === 'error') query.status = { $gte: 400 };
+    }
+
+    const logs = await AuditLog.find(query)
+      .populate('userId', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await AuditLog.countDocuments(query);
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    res.status(200).json({ 
+      success: true, 
+      count: logs.length,
+      total,
+      totalPages,
+      currentPage: parseInt(page),
+      data: logs 
+    });
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 };

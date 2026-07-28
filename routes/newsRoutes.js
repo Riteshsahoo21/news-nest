@@ -20,6 +20,7 @@ import {
 } from '../controllers/newsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
+import { commentLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.get('/:category', getNewsByCategory);
 // --- Authenticated user routes (likes, comments, saves) ---
 router.post('/article/:id/like', verifyToken, likeNews);
 router.put('/article/:id/save', verifyToken, saveNews);
-router.post('/article/:id/comments', verifyToken, addComment);
+router.post('/article/:id/comments', verifyToken, commentLimiter, addComment);
 
 // Protected CRUD routes
 // Reporters can create (submit) news. Editors and Admins can also create.

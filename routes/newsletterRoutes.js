@@ -8,11 +8,12 @@ import {
   sendManualCampaign 
 } from '../controllers/newsletterController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
+import { newsletterLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
 // Public Routes
-router.post('/subscribe', subscribe);
+router.post('/subscribe', newsletterLimiter, subscribe);
 router.get('/unsubscribe', unsubscribe); // GET for easy email link clicking
 
 // Admin Routes

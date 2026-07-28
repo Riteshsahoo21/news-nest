@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getAuth } from 'firebase-admin/auth';
+import axios from 'axios';
 
 const generateToken = (user) => {
   return jwt.sign({ userId: user._id, roles: user.roles || (user.role ? [user.role] : []) }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -9,10 +10,23 @@ const generateToken = (user) => {
 
 export const register = async (req, res) => {
   try {
-    const { fullName, email, mobileNumber, password } = req.body;
+    const { fullName, email, mobileNumber, password, captchaToken } = req.body;
 
     if (!fullName || !email || !password) {
       return res.status(400).json({ error: 'Please provide fullName, email, and password' });
+    }
+
+    if (!captchaToken) {
+      return res.status(400).json({ error: 'Please complete the CAPTCHA' });
+    }
+
+    // Verify CAPTCHA
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
+    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${captchaToken}`;
+    
+    const captchaResponse = await axios.post(verifyUrl);
+    if (!captchaResponse.data.success) {
+      return res.status(400).json({ error: 'Failed CAPTCHA verification' });
     }
 
     const existingUser = await User.findOne({ email });
