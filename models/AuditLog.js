@@ -44,6 +44,27 @@ const auditLogSchema = new mongoose.Schema({
   },
   sessionId: {
     type: String, 
+  },
+  moduleCategory: {
+    type: String,
+    enum: ['Content', 'Users & Access', 'Monetization', 'Community', 'System', 'Authentication', 'General'],
+    default: 'General',
+  },
+  targetEntity: {
+    type: {
+      entityType: String, // e.g., "Article", "User", "Live Blog", "Role"
+      entityName: String, // e.g., "Union Budget Highlights", "john@example.com"
+      entityId: String,   // ID or param if available
+    },
+    default: {},
+  },
+  deviceInfo: {
+    type: {
+      browser: String,
+      os: String,
+      deviceType: String,
+    },
+    default: {},
   }
 }, { timestamps: true });
 

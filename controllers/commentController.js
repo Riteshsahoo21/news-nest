@@ -1,15 +1,24 @@
 import Comment from '../models/Comment.js';
 
-// Delete a comment (Admin only)
+// Delete a comment (Admin or comment author)
 export const deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
+    const roles = req.user.roles || [];
+    const isAdmin = roles.includes('admin');
 
-    const deletedComment = await Comment.findByIdAndDelete(id);
+    const comment = await Comment.findById(id);
 
-    if (!deletedComment) {
+    if (!comment) {
       return res.status(404).json({ error: 'Comment not found' });
     }
+
+    if (comment.userId.toString() !== userId && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to delete this comment' });
+    }
+
+    await Comment.findByIdAndDelete(id);
 
     res.json({ message: 'Comment deleted successfully', commentId: id });
   } catch (error) {

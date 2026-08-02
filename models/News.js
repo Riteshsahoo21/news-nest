@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { createSlug } from '../utils/slugify.js';
 
 // Categories are now managed dynamically via the Category model
 
@@ -99,10 +100,27 @@ const newsSchema = new mongoose.Schema(
       type: String,
       enum: ['all', 'staff_only', 'off'],
       default: 'all',
-    }
+    },
+    // --- Advanced SEO Slug & Metadata ---
+    slug: {
+      type: String,
+      unique: true,
+      index: true,
+      sparse: true
+    },
+    seoTitle: { type: String, default: '' },
+    metaDescription: { type: String, default: '' },
   },
   { timestamps: true }
 );
 
+newsSchema.pre('save', function() {
+  if (this.isModified('title') || !this.slug) {
+    this.slug = createSlug(this.title, this._id);
+  }
+});
+
 const News = mongoose.model('News', newsSchema);
 export default News;
+
+

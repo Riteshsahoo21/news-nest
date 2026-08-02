@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { fetchAndSaveCurrentsNews } from '../services/currentsService.js';
-import { fetchAndSaveYouTubeNews } from '../services/youtubeService.js';
+import { fetchAndSaveYouTubeNews, fetchAndSaveCategoryVideos, balanceAllCategoryCounts } from '../services/youtubeService.js';
 import News from '../models/News.js';
 
 // Schedule Currents API to run every hour
@@ -17,12 +17,15 @@ export const initCronJobs = () => {
     try {
       await fetchAndSaveYouTubeNews();
       
-      const categoriesToFetch = ['Politics', 'Sports', 'Technology', 'Business', 'Entertainment', 'Health', 'Science', 'Lifestyle'];
+      const categoriesToFetch = ['World', 'Politics', 'Sports', 'Technology', 'Business', 'Entertainment', 'Health', 'Science', 'Lifestyle'];
       for (const category of categoriesToFetch) {
          await fetchAndSaveCategoryVideos(category);
          // Add a small delay between requests to avoid rate limit spikes
          await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      
+      // Ensure equal volume of news articles/videos across all 9 categories
+      await balanceAllCategoryCounts(15);
     } catch (err) {
       console.error('Scheduled YouTube fetch failed:', err.message);
     }

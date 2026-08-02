@@ -11,7 +11,7 @@ const getSortObject = (sort) => {
 // Get all news
 export const getAllNews = async (req, res) => {
   try {
-    const { sort, q } = req.query;
+    const { sort, q, limit } = req.query;
     const sortObj = getSortObject(sort);
     
     let filter = {};
@@ -26,7 +26,11 @@ export const getAllNews = async (req, res) => {
       ];
     }
     
-    const news = await News.find(filter).sort(sortObj);
+    let query = News.find(filter).sort(sortObj);
+    if (limit) {
+      query = query.limit(parseInt(limit));
+    }
+    const news = await query;
     res.json(news);
   } catch (error) {
     console.error('Error fetching all news:', error);
@@ -34,21 +38,24 @@ export const getAllNews = async (req, res) => {
   }
 };
 
-// Get single news by ID with comments
+// Get single news by ID or semantic slug with comments
 export const getNewsById = async (req, res) => {
   try {
     const { id } = req.params;
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    
     // We increment views directly here
-    const news = await News.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true }).populate('likes', 'fullName');
+    const news = await News.findOneAndUpdate(query, { $inc: { views: 1 } }, { new: true }).populate('likes', 'fullName');
     
     if (!news) {
       return res.status(404).json({ error: 'News article not found' });
     }
 
-    // Fetch associated comments
-    const comments = await Comment.find({ newsId: id, isApproved: true })
+    // Fetch associated comments using confirmed news._id
+    const comments = await Comment.find({ newsId: news._id, isApproved: true })
       .sort({ createdAt: -1 })
-      .populate('userId', 'fullName');
+      .populate('userId', 'fullName profilePicture');
 
     res.json({ article: news, comments });
   } catch (error) {
@@ -87,8 +94,13 @@ export const getNewsByCategory = async (req, res) => {
     const { category } = req.params;
     const sortObj = getSortObject(req.query.sort);
     
-    // category will be converted to lowercase in the DB, but just in case
-    const news = await News.find({ category: category.toLowerCase(), status: 'approved' }).sort(sortObj);
+    let catQuery = (category || '').toLowerCase().trim();
+    if (catQuery === 'tech') catQuery = 'technology';
+    if (catQuery === 'biz') catQuery = 'business';
+    if (catQuery === 'ent') catQuery = 'entertainment';
+    if (catQuery === 'sci') catQuery = 'science';
+    
+    const news = await News.find({ category: catQuery, status: 'approved' }).sort(sortObj);
     
     res.json(news);
   } catch (error) {
@@ -256,7 +268,9 @@ export const likeNews = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id; // User added by verifyToken middleware
 
-    const news = await News.findById(id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    const news = await News.findOne(query);
     if (!news) {
       return res.status(404).json({ error: 'News article not found' });
     }
@@ -282,8 +296,10 @@ export const likeNews = async (req, res) => {
 export const shareNews = async (req, res) => {
   try {
     const { id } = req.params;
-    const news = await News.findByIdAndUpdate(
-      id,
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    const news = await News.findOneAndUpdate(
+      query,
       { $inc: { shares: 1 } },
       { new: true }
     );
@@ -305,7 +321,9 @@ export const saveNews = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const news = await News.findById(id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    const news = await News.findOne(query);
     if (!news) return res.status(404).json({ error: 'News article not found' });
 
     const saveIndex = news.savedBy.indexOf(userId);
@@ -334,23 +352,28 @@ export const addComment = async (req, res) => {
       return res.status(400).json({ error: 'Comment content is required' });
     }
 
-    const news = await News.findById(id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    const news = await News.findOne(query);
     if (!news) {
       return res.status(404).json({ error: 'News article not found' });
     }
 
     const comment = await Comment.create({
-      newsId: id,
+      newsId: news._id,
       userId,
       content,
       parentCommentId: parentCommentId || null,
     });
 
-    const populatedComment = await comment.populate('userId', 'fullName');
+    const populatedComment = await comment.populate('userId', 'fullName profilePicture');
 
     // Broadcast the new comment via Socket.io
     if (req.io) {
       req.io.to(id).emit('comment_added', populatedComment);
+      if (news._id.toString() !== id) {
+        req.io.to(news._id.toString()).emit('comment_added', populatedComment);
+      }
     }
 
     res.status(201).json({ message: 'Comment added successfully', comment: populatedComment });
@@ -435,6 +458,28 @@ export const rejectNews = async (req, res) => {
     res.json({ message: 'Article rejected', article: news });
   } catch (error) {
     console.error('Error rejecting news:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get news by a specific author
+export const getNewsByAuthor = async (req, res) => {
+  try {
+    const { authorId } = req.params;
+    const { sort, limit } = req.query;
+    
+    const sortObj = getSortObject(sort);
+    
+    // We fetch approved articles written by this specific author
+    let query = News.find({ authorId: authorId, status: 'approved' }).populate('authorId', 'fullName profilePicture');
+    
+    if (sortObj) query = query.sort(sortObj);
+    if (limit) query = query.limit(parseInt(limit));
+    
+    const news = await query;
+    res.json(news);
+  } catch (error) {
+    console.error('Error fetching news by author:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

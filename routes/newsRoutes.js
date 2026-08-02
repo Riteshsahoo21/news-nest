@@ -16,18 +16,21 @@ import {
   getMySubmittedNews,
   approveNews,
   rejectNews,
-  saveNews
+  saveNews,
+  getNewsByAuthor
 } from '../controllers/newsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import { commentLimiter } from '../middleware/rateLimiters.js';
+import cacheMiddleware from '../middleware/cacheMiddleware.js';
 
 const router = express.Router();
 
 // --- Public routes ---
-router.get('/', getAllNews);
-router.get('/editor-picks', getEditorPicks);
-router.get('/trending', getTrendingNews);
+router.get('/', cacheMiddleware(60), getAllNews); // Cache for 1 minute
+router.get('/editor-picks', cacheMiddleware(60), getEditorPicks);
+router.get('/trending', cacheMiddleware(60), getTrendingNews);
+router.get('/author/:authorId', getNewsByAuthor);
 router.get('/article/:id', getNewsById);
 router.post('/article/:id/share', shareNews);
 
@@ -40,7 +43,7 @@ router.put('/:id/approve', verifyToken, authorizePermissions('approve_content'),
 router.put('/:id/reject', verifyToken, authorizePermissions('approve_content'), rejectNews);
 
 // --- Public Category Route ---
-router.get('/:category', getNewsByCategory);
+router.get('/:category', cacheMiddleware(60), getNewsByCategory);
 
 // --- Authenticated user routes (likes, comments, saves) ---
 router.post('/article/:id/like', verifyToken, likeNews);

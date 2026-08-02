@@ -31,7 +31,7 @@ export const getGalleryById = async (req, res) => {
     }
 
     const comments = await Comment.find({ galleryId: id, isApproved: true })
-      .populate('userId', 'fullName')
+      .populate('userId', 'fullName profilePicture')
       .sort({ createdAt: -1 });
 
     res.json({ gallery, comments });
@@ -275,7 +275,7 @@ export const addComment = async (req, res) => {
       parentCommentId: parentCommentId || null,
     });
 
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'fullName');
+    const populatedComment = await Comment.findById(comment._id).populate('userId', 'fullName profilePicture');
 
     // Broadcast the new comment via Socket.io
     if (req.io) {

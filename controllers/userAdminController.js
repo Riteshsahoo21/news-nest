@@ -50,8 +50,11 @@ export const updateUserRole = async (req, res) => {
     if (roles.includes('registered_premium')) {
       roles = ['registered_user'];
       isPremium = true;
-    } else if (roles.includes('registered_user')) {
-      isPremium = false; // Revoke premium if explicitly set back to registered_user
+    } else if (roles.includes('reporter_premium')) {
+      roles = ['reporter'];
+      isPremium = true;
+    } else if (roles.includes('registered_user') || roles.includes('reporter')) {
+      isPremium = false; // Revoke premium if explicitly set back to non-premium role
     }
     
     // Validate roles dynamically
@@ -110,6 +113,30 @@ export const toggleUserStatus = async (req, res) => {
     res.json({ message: `User account ${isActive ? 'activated' : 'disabled'}`, user: { id: targetUser._id, isActive } });
   } catch (error) {
     console.error('Error toggling user status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Toggle live blog creation access for reporters (Admin only)
+export const toggleLiveBlogAccess = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { canManageLiveBlogs } = req.body;
+    
+    if (typeof canManageLiveBlogs !== 'boolean') {
+      return res.status(400).json({ error: 'canManageLiveBlogs must be a boolean' });
+    }
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await User.findByIdAndUpdate(id, { canManageLiveBlogs }, { runValidators: false });
+    
+    res.json({ message: `Live Blog access ${canManageLiveBlogs ? 'granted' : 'revoked'}`, user: { id: targetUser._id, canManageLiveBlogs } });
+  } catch (error) {
+    console.error('Error toggling live blog access:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

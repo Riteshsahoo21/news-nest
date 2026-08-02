@@ -17,4 +17,17 @@ router.post('/', verifyToken, authorizeRoles('admin', 'editor', 'reporter'), upl
   }
 });
 
+// Endpoint for regular users to upload avatars
+router.post('/avatar', verifyToken, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
+    res.json({ url: req.file.path });
+  } catch (error) {
+    console.error('Avatar Upload Error:', error);
+    res.status(500).json({ error: 'Failed to upload avatar' });
+  }
+});
+
 export default router;

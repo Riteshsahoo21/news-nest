@@ -16,7 +16,14 @@ export const getAllVideos = async (req, res) => {
     const { category, isShort, isFeatured } = req.query;
     const filter = {};
     
-    if (category) filter.category = category.toLowerCase();
+    if (category) {
+      let cat = category.toLowerCase().trim();
+      if (cat === 'tech') cat = 'technology';
+      if (cat === 'biz') cat = 'business';
+      if (cat === 'ent') cat = 'entertainment';
+      if (cat === 'sci') cat = 'science';
+      filter.category = cat;
+    }
     if (isShort !== undefined) filter.isShort = isShort === 'true';
     if (isFeatured !== undefined) filter.isFeatured = isFeatured === 'true';
 

@@ -12,11 +12,12 @@ import {
 } from '../controllers/videoNewsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import { commentLimiter } from '../middleware/rateLimiters.js';
+import cacheMiddleware from '../middleware/cacheMiddleware.js';
 
 const router = express.Router();
 
 // Public routes
-router.get('/', getAllVideos);
+router.get('/', cacheMiddleware(60), getAllVideos); // Cache for 1 minute
 router.get('/:id', getVideoById);
 router.post('/:id/download', incrementDownload);
 

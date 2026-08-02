@@ -1,9 +1,10 @@
 import express from 'express';
 import { 
   getAllUsers, 
-  getUserById, 
-  updateUserRole, 
+  getUserById,
+  updateUserRole,
   toggleUserStatus,
+  toggleLiveBlogAccess,
   addStaff,
   addEditor
 } from '../controllers/userAdminController.js';
@@ -28,5 +29,6 @@ router.get('/', getAllUsers);
 router.get('/:id', getUserById);
 router.put('/:id/role', updateUserRole);
 router.put('/:id/status', toggleUserStatus);
+router.put('/:id/live-blog-access', toggleLiveBlogAccess);
 
 export default router;

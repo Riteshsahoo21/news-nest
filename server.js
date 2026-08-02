@@ -30,10 +30,12 @@ import adRoutes from './routes/adRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import revenueRoutes from './routes/revenueRoutes.js';
 import { stripeWebhook } from './controllers/stripeController.js';
-import { initCronJobs } from './cron/newsFetcher.js';
+import { initQueues } from './workers/newsQueue.js';
 import { initNewsletterCron } from './cron/newsletterScheduler.js';
 import { initSubscriptionCron } from './cron/subscriptionScheduler.js';
 import { seedDefaultRoles } from './utils/seedRoles.js';
+import { getGeneralSitemap, getGoogleNewsSitemap, getRssFeed } from './controllers/sitemapController.js';
+import { socialBotInterceptor } from './middleware/socialBotInterceptor.js';
 
 // Initialize Firebase Admin SDK
 let firebaseApp;
@@ -112,11 +114,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// SEO & Crawler Syndication Feeds
+app.get('/api/sitemap.xml', getGeneralSitemap);
+app.get('/api/news-sitemap.xml', getGoogleNewsSitemap);
+app.get('/api/feed/rss.xml', getRssFeed);
+app.get('/api/share/:idOrSlug', socialBotInterceptor);
+app.get('/api/share', socialBotInterceptor);
+
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/news', newsRoutes);
+app.use('/api/news', socialBotInterceptor, newsRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/live-blogs', liveBlogRoutes);
+app.use('/api/live-blogs', socialBotInterceptor, liveBlogRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/photo-galleries', photoGalleryRoutes);
 app.use('/api/videos', videoNewsRoutes);
@@ -154,11 +163,11 @@ app.get('/api/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT} across all interfaces (0.0.0.0)`);
   
-  // Initialize Cron Jobs
-  initCronJobs();
+  // Initialize BullMQ Queues (replaces initCronJobs)
+  initQueues();
   initNewsletterCron();
   initSubscriptionCron();
 

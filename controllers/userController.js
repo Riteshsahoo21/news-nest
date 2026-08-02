@@ -99,12 +99,42 @@ export const getMyInvoices = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { fullName, mobileNumber, bio, location, socialLinks, profilePicture } = req.body;
+    const { fullName, username, mobileNumber, bio, location, socialLinks, profilePicture } = req.body;
     
     // Find user and update
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
+    // Handle Username Change
+    if (username !== undefined) {
+      const sanitizedUsername = username.replace(/\s+/g, '').toLowerCase();
+      if (sanitizedUsername && sanitizedUsername !== (user.username || '').toLowerCase()) {
+        // Check if taken
+        const existingUser = await User.findOne({ username: sanitizedUsername });
+        if (existingUser && existingUser._id.toString() !== user._id.toString()) {
+          return res.status(400).json({ error: 'Username is already taken' });
+        }
+
+        const userRoles = user.roles || (user.role ? [user.role] : []);
+        const isAdmin = userRoles.includes('admin');
+
+        // Check 14 days rule ONLY if user has already customized their username once
+        if (!isAdmin && user.hasCustomizedUsername && user.lastUsernameChange) {
+          const daysSinceChange = (Date.now() - new Date(user.lastUsernameChange).getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceChange < 14) {
+            const daysLeft = Math.ceil(14 - daysSinceChange);
+            return res.status(400).json({ error: `You can only change your username once every 14 days. Try again in ${daysLeft} day(s).` });
+          }
+        }
+
+        user.username = sanitizedUsername;
+        if (!isAdmin) {
+          user.hasCustomizedUsername = true;
+          user.lastUsernameChange = Date.now();
+        }
+      }
+    }
+
     // Update allowed fields
     if (fullName !== undefined) user.fullName = fullName;
     if (mobileNumber !== undefined) user.mobileNumber = mobileNumber;
@@ -126,6 +156,7 @@ export const updateProfile = async (req, res) => {
       user: {
         _id: user._id,
         fullName: user.fullName,
+        username: user.username,
         email: user.email,
         mobileNumber: user.mobileNumber,
         bio: user.bio,
@@ -139,6 +170,81 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getPublicProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .populate('followers', 'fullName profilePicture')
+      .populate('following', 'fullName profilePicture');
+      
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    // Only return safe public information
+    res.json({
+      _id: user._id,
+      fullName: user.fullName,
+      username: user.username,
+      bio: user.bio,
+      location: user.location,
+      profilePicture: user.profilePicture,
+      socialLinks: user.socialLinks,
+      roles: user.roles || (user.role ? [user.role] : []),
+      role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
+      isPremium: user.isPremium,
+      createdAt: user.createdAt,
+      followersCount: user.followers ? user.followers.length : 0,
+      followingCount: user.following ? user.following.length : 0,
+      followers: user.followers || [], 
+      following: user.following || []
+    });
+  } catch (error) {
+    console.error('Error fetching public profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const toggleFollowUser = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user.id;
+
+    if (targetUserId === currentUserId) {
+      return res.status(400).json({ error: 'You cannot follow yourself' });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(currentUserId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isFollowing = currentUser.following.includes(targetUserId);
+
+    if (isFollowing) {
+      // Unfollow
+      currentUser.following.pull(targetUserId);
+      targetUser.followers.pull(currentUserId);
+    } else {
+      // Follow
+      currentUser.following.push(targetUserId);
+      targetUser.followers.push(currentUserId);
+    }
+
+    await currentUser.save();
+    await targetUser.save();
+
+    res.json({
+      success: true,
+      isFollowing: !isFollowing,
+      message: isFollowing ? 'Unfollowed successfully' : 'Followed successfully',
+      followersCount: targetUser.followers.length
+    });
+  } catch (error) {
+    console.error('Error toggling follow:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

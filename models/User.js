@@ -7,6 +7,20 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    username: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+    },
+    lastUsernameChange: {
+      type: Date,
+    },
+    hasCustomizedUsername: {
+      type: Boolean,
+      default: false,
+    },
     email: {
       type: String,
       required: true,
@@ -56,6 +70,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    canManageLiveBlogs: {
+      type: Boolean,
+      default: false,
+    },
     isPremium: {
       type: Boolean,
       default: false,
@@ -71,6 +89,18 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    followers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
+    following: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ],
   },
   { timestamps: true }
 );

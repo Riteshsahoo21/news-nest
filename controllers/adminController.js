@@ -103,13 +103,27 @@ export const getAuditLogStats = async (req, res) => {
     const failed = await AuditLog.countDocuments({ status: { $gte: 400, $lt: 500 } });
     const critical = await AuditLog.countDocuments({ severity: 'critical' });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayCount = await AuditLog.countDocuments({ createdAt: { $gte: today } });
+
+    const categoryAggregation = await AuditLog.aggregate([
+      { $group: { _id: '$moduleCategory', count: { $sum: 1 } } }
+    ]);
+    const byCategory = {};
+    categoryAggregation.forEach(item => {
+      byCategory[item._id || 'General'] = item.count;
+    });
+
     res.status(200).json({
       success: true,
       data: {
         total,
         successful,
         failed,
-        critical
+        critical,
+        todayCount,
+        byCategory
       }
     });
   } catch (error) {
@@ -120,7 +134,7 @@ export const getAuditLogStats = async (req, res) => {
 
 export const getAuditLogs = async (req, res) => {
   try {
-    const { page = 1, limit = 50, search, severity, status, action } = req.query;
+    const { page = 1, limit = 50, search, severity, status, action, moduleCategory, timeRange } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Build query object
@@ -131,7 +145,8 @@ export const getAuditLogs = async (req, res) => {
         { action: { $regex: search, $options: 'i' } },
         { readableAction: { $regex: search, $options: 'i' } },
         { endpoint: { $regex: search, $options: 'i' } },
-        { ipAddress: { $regex: search, $options: 'i' } }
+        { ipAddress: { $regex: search, $options: 'i' } },
+        { 'targetEntity.entityName': { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -141,6 +156,28 @@ export const getAuditLogs = async (req, res) => {
 
     if (action && action !== 'all') {
       query.action = { $regex: action, $options: 'i' };
+    }
+
+    if (moduleCategory && moduleCategory !== 'all') {
+      query.moduleCategory = moduleCategory;
+    }
+
+    if (timeRange && timeRange !== 'all') {
+      const now = new Date();
+      let fromDate;
+      if (timeRange === 'today') {
+        fromDate = new Date(now);
+        fromDate.setHours(0, 0, 0, 0);
+      } else if (timeRange === 'last24h') {
+        fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (timeRange === 'last7d') {
+        fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (timeRange === 'last30d') {
+        fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      if (fromDate) {
+        query.createdAt = { $gte: fromDate };
+      }
     }
 
     if (status && status !== 'all') {
