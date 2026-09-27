@@ -1,0 +1,172 @@
+{
+  "name": "News Nest 3 - AI Daily Newsletter",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "89d13c78-00af-4dd4-848a-496baff8dca9",
+      "name": "Daily at 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-780, -100]
+    },
+    {
+      "parameters": {},
+      "id": "508f138e-3182-46f9-90f0-9530e0f1748e",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-780, 100]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/newsletter/context' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-automation-key",
+              "value": "={{$env.N8N_AUTOMATION_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "937cfa50-bf6c-402e-81d4-4be9f9e9edc3",
+      "name": "Fetch Newsletter Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $json;\nconst stories = Array.isArray(context.topStories) ? context.topStories : [];\nif (Number(context.subscriberCount || 0) < 1 || stories.length < 1) return [];\nconst storyDigest = stories.map((story, index) => `#${index + 1} ${story.title}\\n${story.aiSummary || story.subtitle || ''}\\nBackstory: ${story.backstory || 'Not available'}`).join('\\n\\n');\nconst liveDigest = (context.liveCoverage || []).map((live) => `${live.title}: ${live.matchStatus?.team1?.name || ''} ${live.matchStatus?.team1?.score || ''} vs ${live.matchStatus?.team2?.name || ''} ${live.matchStatus?.team2?.score || ''}`).join('\\n');\nconst prompt = `You are the News Nests morning editor. Write a factual, conversational 60-second morning briefing in 120-170 words. Be lively but never sensational, never invent facts, and do not imitate any named publication. Connect the most important stories smoothly. Return plain text only.\\n\\nLIVE NOW:\\n${liveDigest || 'No active live event'}\\n\\nTOP STORIES:\\n${storyDigest}`;\nreturn [{ json: { context, prompt } }];"
+      },
+      "id": "15fc9a77-e08e-494a-b53f-1163364fcc71",
+      "name": "Prepare Editorial Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash') + ':generateContent' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{$env.GEMINI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { contents: [{ parts: [{ text: $json.prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 320 } } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "f3ecf128-c7e6-4f9e-82a1-d8383fd34b68",
+      "name": "Write 60 Second Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const preparedItems = $('Prepare Editorial Prompt').all();\nconst escapeHtml = (value) => String(value || '').replace(/[&<>\"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[char]));\nreturn $input.all().map((item, index) => {\n  const prepared = preparedItems[index]?.json || preparedItems[0]?.json;\n  const context = prepared.context;\n  const publicUrl = String($env.NEWS_NEST_PUBLIC_URL || 'http://localhost:5174').replace(/\\/$/, '');\n  const generated = (item.json.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join(' ').trim();\n  const fallbackBriefing = (context.topStories || []).map((story) => story.aiSummary || story.subtitle || story.title).filter(Boolean).join(' ').slice(0, 1100);\n  const briefing = escapeHtml(generated || fallbackBriefing);\n  const live = (context.liveCoverage || [])[0];\n  const liveUrl = live ? (live.streamUrl || `${publicUrl}/live-blogs?id=${encodeURIComponent(live.slug || live._id)}`) : '';\n  const liveCard = live ? `\n    <div style=\"background:#2a1118;border:1px solid #9f1239;border-radius:14px;padding:18px;margin-bottom:24px\">\n      <div style=\"color:#fff;background:#e11d48;display:inline-block;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:1px\">LIVE NOW</div>\n      <h2 style=\"font-size:18px;line-height:1.4;color:#fff;margin:12px 0 8px\">${escapeHtml(live.title)}</h2>\n      <p style=\"font-family:monospace;color:#fecdd3;margin:0 0 14px\">${escapeHtml(live.matchStatus?.team1?.name)} ${escapeHtml(live.matchStatus?.team1?.score)} &nbsp; | &nbsp; ${escapeHtml(live.matchStatus?.team2?.name)} ${escapeHtml(live.matchStatus?.team2?.score)}</p>\n      <a href=\"${escapeHtml(liveUrl)}\" style=\"display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:800\">OPEN LIVE COVERAGE →</a>\n    </div>` : '';\n  const storyCards = (context.topStories || []).map((story, storyIndex) => {\n    const storyUrl = `${publicUrl}/?articleId=${encodeURIComponent(story.slug || story._id)}`;\n    const summary = story.aiSummary || story.subtitle || '';\n    const backstory = storyIndex === 0 && story.backstory ? `<div style=\"background:#101216;border:1px dashed #d97706;border-radius:8px;padding:12px 14px;margin-top:12px;color:#fbbf24;font-size:13px;line-height:1.55\"><strong style=\"color:#fef3c7\">The Backstory:</strong> ${escapeHtml(String(story.backstory).replace(/^\\s*(?:📌\\s*)?the backstory\\s*:\\s*/i, ''))}</div>` : '';\n    const related = (story.relatedArticles || []).slice(0, 3).map((relatedStory) => `<a href=\"${publicUrl}/?articleId=${encodeURIComponent(relatedStory.slug || relatedStory._id)}\" style=\"display:inline-block;background:#20242c;color:#93c5fd;text-decoration:none;padding:4px 8px;border-radius:6px;margin:5px 5px 0 0;font-size:11px\">${escapeHtml(relatedStory.title)}</a>`).join('');\n    return `<div style=\"background:#16181d;border:1px solid #30333a;border-radius:12px;padding:18px;margin-bottom:18px\"><span style=\"font-size:10px;font-weight:800;color:#facc15;text-transform:uppercase;letter-spacing:1px\">#${storyIndex + 1} ${escapeHtml(story.category || 'Top Story')}</span><a href=\"${storyUrl}\" style=\"font-size:18px;font-weight:750;color:#fff;text-decoration:none;line-height:1.4;display:block;margin:10px 0 8px\">${escapeHtml(story.title)}</a><p style=\"font-size:14px;color:#a8adb7;line-height:1.65;margin:0\">${escapeHtml(summary)}</p>${backstory}${related ? `<div style=\"margin-top:12px;padding-top:10px;border-top:1px solid #30333a;color:#737985;font-size:11px\">RELATED CONTEXT<br>${related}</div>` : ''}</div>`;\n  }).join('');\n  const today = new Intl.DateTimeFormat('en-IN', { dateStyle: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());\n  const html = `<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>News Nests Daily Digest</title></head><body style=\"margin:0;padding:0;background:#0c0d0e;color:#f3f4f6;font-family:Arial,Helvetica,sans-serif\"><div style=\"padding:20px 10px\"><div style=\"max-width:600px;margin:0 auto;background:#121417;border:1px solid #262930;border-radius:16px;overflow:hidden\"><div style=\"padding:30px 24px 22px;text-align:center;border-bottom:1px solid #262930\"><a href=\"${publicUrl}\" style=\"font-size:26px;font-weight:900;color:#fff;text-decoration:none\">NEWS <span style=\"color:#e11d48\">NESTS</span></a><div style=\"font-size:11px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;margin-top:7px\">Daily Intelligence · ${escapeHtml(today)}</div></div><div style=\"padding:24px\">${liveCard}<div style=\"background:#181b20;border-left:4px solid #3b82f6;border-radius:0 12px 12px 0;padding:17px 20px;margin-bottom:24px\"><div style=\"font-size:12px;font-weight:800;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px\">The 60-Second Wakeup Briefing</div><p style=\"font-size:14px;line-height:1.7;color:#d1d5db;margin:0\">${briefing}</p></div>${storyCards}</div><div style=\"padding:24px;text-align:center;border-top:1px solid #262930;color:#737985;font-size:12px;line-height:1.7\"><p>You received this because you subscribed to News Nests.</p><p><a href=\"${publicUrl}/newsletter?email={{subscriberEmail}}\" style=\"color:#a8adb7\">Update preferences</a> &nbsp;·&nbsp; <a href=\"${publicUrl}/api/newsletter/unsubscribe?email={{subscriberEmail}}\" style=\"color:#a8adb7\">Unsubscribe</a></p><p>© ${new Date().getFullYear()} News Nests</p></div></div></div></body></html>`;\n  return { json: { subject: `News Nests Morning Brief — ${today}`, content: html }, pairedItem: { item: index } };\n});"
+      },
+      "id": "184b903c-b16c-4fad-83ca-c3efedab10a7",
+      "name": "Render Personalized HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/newsletter/send' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-automation-key",
+              "value": "={{$env.N8N_AUTOMATION_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { subject: $json.subject, content: $json.content } }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "ed3cfa9a-42bf-4312-9e69-33387aa0c0df",
+      "name": "Send Through News Nest SMTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily at 8 AM": {
+      "main": [[{"node": "Fetch Newsletter Context", "type": "main", "index": 0}]]
+    },
+    "Manual Test Trigger": {
+      "main": [[{"node": "Fetch Newsletter Context", "type": "main", "index": 0}]]
+    },
+    "Fetch Newsletter Context": {
+      "main": [[{"node": "Prepare Editorial Prompt", "type": "main", "index": 0}]]
+    },
+    "Prepare Editorial Prompt": {
+      "main": [[{"node": "Write 60 Second Briefing", "type": "main", "index": 0}]]
+    },
+    "Write 60 Second Briefing": {
+      "main": [[{"node": "Render Personalized HTML", "type": "main", "index": 0}]]
+    },
+    "Render Personalized HTML": {
+      "main": [[{"node": "Send Through News Nest SMTP", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "1dce5e1e-35b3-4118-975a-0c4f6bd04df7",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

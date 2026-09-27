@@ -1,0 +1,218 @@
+{
+  "name": "News Nest 2 - Zero Touch Live Sports Feeder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "id": "0797279c-f2e2-49b9-9390-823ca288b96b",
+      "name": "Discover Fixtures Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-780, -180]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.NEWS_NEST_SCRAPER_URL || 'http://host.docker.internal:8000') + '/api/sports/upcoming-cricket' }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "054b8a6b-4d96-4d97-b583-e425fb827b1c",
+      "name": "Fetch Upcoming Cricket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-540, -180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const matches = Array.isArray($json.matches) ? $json.matches : [];\nreturn matches\n  .filter((match) => match.externalMatchId && match.title)\n  .map((match) => ({ json: match }));"
+      },
+      "id": "3fd10905-77bd-4298-b064-bef4b9a0d1c8",
+      "name": "Expand Fixtures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, -180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs/upsert-fixture' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-automation-key",
+              "value": "={{$env.N8N_AUTOMATION_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fixture: $json } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "6a50cd42-00f5-45fb-8b71-b0de6645903c",
+      "name": "Create or Reuse Live Blog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-60, -180]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "788f80ec-e922-4500-964f-d8232d1ab319",
+      "name": "Poll Live Scores Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-780, 160]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs?isLive=true&limit=100' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-automation-key",
+              "value": "={{$env.N8N_AUTOMATION_KEY}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "8dd5c05b-0c87-4eb6-9b80-25c19f0371d7",
+      "name": "Fetch Active Automated Blogs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-540, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const blogs = Array.isArray($json.liveBlogs) ? $json.liveBlogs : [];\nreturn blogs\n  .filter((blog) => /^cric_\\d+$/.test(String(blog.externalMatchId || '')))\n  .map((blog) => ({ json: { liveBlogId: blog._id, externalMatchId: blog.externalMatchId } }));"
+      },
+      "id": "f98d4850-6918-47b1-ae14-f33541c9a721",
+      "name": "Expand Active Matches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 160]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.NEWS_NEST_SCRAPER_URL || 'http://host.docker.internal:8000') + '/api/sports/live-score/' + encodeURIComponent($json.externalMatchId) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "8e901fe8-ac52-43cc-b1cf-80c497b411fd",
+      "name": "Fetch Live Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-60, 160],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter((item) => item.json && item.json.externalMatchId && !item.json.error)\n  .map((item, index) => ({ json: item.json, pairedItem: { item: index } }));"
+      },
+      "id": "d2558efd-a9df-45ae-bb8d-4d6b71d9c64b",
+      "name": "Keep Successful Scores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [180, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs/sync-score/' + encodeURIComponent($json.externalMatchId) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-automation-key",
+              "value": "={{$env.N8N_AUTOMATION_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { score: $json } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "0eab0aba-5483-4aac-b26b-0df05765075c",
+      "name": "Sync Score and Commentary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 160]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Discover Fixtures Hourly": {
+      "main": [[{"node": "Fetch Upcoming Cricket", "type": "main", "index": 0}]]
+    },
+    "Fetch Upcoming Cricket": {
+      "main": [[{"node": "Expand Fixtures", "type": "main", "index": 0}]]
+    },
+    "Expand Fixtures": {
+      "main": [[{"node": "Create or Reuse Live Blog", "type": "main", "index": 0}]]
+    },
+    "Poll Live Scores Every 2 Minutes": {
+      "main": [[{"node": "Fetch Active Automated Blogs", "type": "main", "index": 0}]]
+    },
+    "Fetch Active Automated Blogs": {
+      "main": [[{"node": "Expand Active Matches", "type": "main", "index": 0}]]
+    },
+    "Expand Active Matches": {
+      "main": [[{"node": "Fetch Live Score", "type": "main", "index": 0}]]
+    },
+    "Fetch Live Score": {
+      "main": [[{"node": "Keep Successful Scores", "type": "main", "index": 0}]]
+    },
+    "Keep Successful Scores": {
+      "main": [[{"node": "Sync Score and Commentary", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "2f94afdb-347b-4b52-bc52-63a4f7a09e65",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
