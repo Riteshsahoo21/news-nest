@@ -11,10 +11,12 @@ import FormattedArticleContent from './FormattedArticleContent';
 import SafeImage from './common/SafeImage';
 import AiSummaryCard from './AiSummaryCard';
 import BackstoryCard from './BackstoryCard';
-import { useSearchParams } from 'react-router-dom';
+import RelatedNewsSection from './RelatedNewsSection';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export default function ArticleModal({ articleId, onClose }) {
   const [currentSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [article, setArticle] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -87,21 +89,25 @@ export default function ArticleModal({ articleId, onClose }) {
         setError('');
         setArticle(null);
         const response = await api.get(`/news/article/${articleId}`);
-        setArticle(response.data.article);
+        const art = response.data.article;
+        setArticle(art);
         setComments(response.data.comments || []);
         
-        if (response.data.article) {
-          const { category, tags, _id } = response.data.article;
-          
-          let queryUrl = `/news/related?articleId=${_id}`;
-          if (category) queryUrl += `&category=${category}`;
-          if (tags && tags.length > 0) queryUrl += `&tags=${tags.join(',')}`;
-          
-          try {
-            const relatedRes = await api.get(queryUrl);
-            setRelatedNews(relatedRes.data);
-          } catch (e) {
-            console.error('Failed to fetch related news', e);
+        if (art) {
+          if (art.relatedArticles && art.relatedArticles.length > 0) {
+            setRelatedNews(art.relatedArticles);
+          } else {
+            const { category, tags, _id } = art;
+            let queryUrl = `/news/related?articleId=${_id}`;
+            if (category) queryUrl += `&category=${category}`;
+            if (tags && tags.length > 0) queryUrl += `&tags=${tags.join(',')}`;
+            
+            try {
+              const relatedRes = await api.get(queryUrl);
+              setRelatedNews(relatedRes.data);
+            } catch (e) {
+              console.error('Failed to fetch related news', e);
+            }
           }
         }
         
@@ -581,29 +587,17 @@ export default function ArticleModal({ articleId, onClose }) {
                 )}
 
 
-                {/* Related News Section */}
-                {relatedNews.length > 0 && (
-                  <div className="mt-10 pt-8 border-t border-border/50">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
-                      Related News
-                    </h3>
-                    <div className="flex flex-col space-y-4">
-                      {relatedNews.map((news) => (
-                        <div key={news._id} className="group relative">
-                          <a 
-                            href={getArticleUrl(news.slug || news._id)}
-                            className="block p-4 rounded-xl border border-gray-100 hover:border-red-100 hover:bg-red-50/50 transition-all duration-300"
-                          >
-                            <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors line-clamp-2">
-                              {news.title}
-                            </h4>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Past News & Related Coverage Timeline */}
+                <RelatedNewsSection 
+                  articles={relatedNews.length > 0 ? relatedNews : (article.relatedArticles || [])} 
+                  variant="modal" 
+                  title="Past News & Related Coverage" 
+                  onSelectArticle={(targetId) => {
+                    const nextParams = new URLSearchParams(currentSearchParams);
+                    nextParams.set('articleId', targetId);
+                    navigate(`?${nextParams.toString()}`);
+                  }}
+                />
 
                 {/* Comments Section */}
                 <div className="mt-10 pt-8 border-t border-border/50">

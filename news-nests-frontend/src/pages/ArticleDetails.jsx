@@ -12,6 +12,7 @@ import FormattedArticleContent from '../components/FormattedArticleContent';
 import AiSummaryCard from '../components/AiSummaryCard';
 import BackstoryCard from '../components/BackstoryCard';
 import SafeImage from '../components/common/SafeImage';
+import RelatedNewsSection from '../components/RelatedNewsSection';
 
 export default function ArticleDetails() {
   const { id } = useParams();
@@ -53,7 +54,16 @@ export default function ArticleDetails() {
     const fetchArticle = async () => {
       try {
         const response = await api.get(`/news/article/${id}`);
-        setArticle(response.data.article || response.data);
+        const art = response.data.article || response.data;
+        if (art && (!art.relatedArticles || art.relatedArticles.length === 0)) {
+          try {
+            const relRes = await api.get(`/news/related?articleId=${art._id}&category=${art.category}`);
+            if (relRes.data && relRes.data.length > 0) {
+              art.relatedArticles = relRes.data;
+            }
+          } catch (_) {}
+        }
+        setArticle(art);
         
         // Only staff preview custom interstitials
         if (isStaff) {
@@ -340,6 +350,13 @@ export default function ArticleDetails() {
               </div>
             )}
 
+            {/* Past News & Related Coverage Timeline */}
+            <RelatedNewsSection 
+              articles={article.relatedArticles} 
+              variant="grid" 
+              title="Past News & Related Coverage" 
+            />
+
             <NewsletterSignup className="mt-12" />
           </div>
         </article>
@@ -354,10 +371,11 @@ export default function ArticleDetails() {
               </div>
             )}
             
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <h3 className="font-bold text-gray-900 mb-4 uppercase text-sm tracking-wider">More News</h3>
-              <p className="text-sm text-gray-500">More related articles will appear here.</p>
-            </div>
+            <RelatedNewsSection 
+              articles={article.relatedArticles} 
+              variant="sidebar" 
+              title="Past Related News" 
+            />
           </div>
         </aside>
 

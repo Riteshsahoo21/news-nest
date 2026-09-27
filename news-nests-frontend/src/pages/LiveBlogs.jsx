@@ -16,19 +16,21 @@ import {
   Flame,
   ArrowUpRight,
   ShieldAlert,
-  MessageCircle
+  MessageCircle,
+  CheckCircle
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import LiveBlogDetailModal from '../components/LiveBlogDetailModal';
 
 export default function LiveBlogs() {
   const { user } = useAuth();
+  const { id: routeId } = useParams();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeBlogId, setActiveBlogId] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeBlogId, setActiveBlogId] = useState(routeId || searchParams.get('id') || null);
+  const [isModalOpen, setIsModalOpen] = useState(!!(routeId || searchParams.get('id')));
   const [savedIds, setSavedIds] = useState([]);
   const [lastUpdatedTime, setLastUpdatedTime] = useState(new Date());
 
@@ -43,19 +45,39 @@ export default function LiveBlogs() {
     return () => clearInterval(interval);
   }, []);
 
-  // Open modal if URL parameter has ?id=...
+  // Open modal if URL parameter has ?id=... or route param
   useEffect(() => {
-    const paramId = searchParams.get('id');
-    if (paramId) {
-      setActiveBlogId(paramId);
+    const targetId = routeId || searchParams.get('id');
+    if (targetId) {
+      setActiveBlogId(targetId);
       setIsModalOpen(true);
     }
-  }, [searchParams]);
+  }, [routeId, searchParams]);
+
+  const [statusTab, setStatusTab] = useState('live'); // 'live' | 'archive'
+
+  const COMPLETE_WORDS = [
+    'won by', 'won the', 'match complete', 'complete', 'match over', 'abandoned',
+    'match drawn', 'match tied', 'no result', 'game over', 'final result', 'defeated by', 'concluded'
+  ];
+
+  const isBlogActive = (b) => {
+    if (!b || b.isLive === false) return false;
+    const matchInfo = String(b.matchStatus?.matchInfo || '').toLowerCase();
+    if (COMPLETE_WORDS.some(w => matchInfo.includes(w))) return false;
+    const t1Score = String(b.matchStatus?.team1?.score || '').toLowerCase();
+    const t2Score = String(b.matchStatus?.team2?.score || '').toLowerCase();
+    if (COMPLETE_WORDS.some(w => t1Score.includes(w) || t2Score.includes(w))) return false;
+    if (b.streamType && b.streamType !== 'none' && !b.isStreamActive && (!b.updates || b.updates.length === 0)) {
+      return false;
+    }
+    return true;
+  };
 
   const fetchBlogs = async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
-      const res = await api.get('/live-blogs');
+      const res = await api.get('/live-blogs?status=all');
       const list = res.data || [];
       setBlogs(list);
       setLastUpdatedTime(new Date());
@@ -103,15 +125,15 @@ export default function LiveBlogs() {
   const userRoles = user?.roles || [user?.role || ''];
   const canBroadcast = userRoles.some(r => ['admin', 'editor'].includes(r)) || (userRoles.includes('reporter') && user?.canManageLiveBlogs === true);
 
-  // For normal users/readers, ended live blogs (isLive === false) are completely hidden. Staff retain access for review or reopening.
-  const visibleBlogs = blogs.filter(b => {
-    if (canBroadcast) return true;
-    return b.isLive !== false;
-  });
+  // Active vs Concluded separation: Ended blogs/streams never appear in the Live feed
+  const activeBlogsList = blogs.filter(isBlogActive);
+  const concludedBlogsList = blogs.filter(b => !isBlogActive(b));
+
+  const currentTabBlogs = statusTab === 'live' ? activeBlogsList : concludedBlogsList;
 
   const filteredBlogs = selectedCategory === 'All'
-    ? visibleBlogs
-    : visibleBlogs.filter(b => b.category?.toLowerCase() === selectedCategory.toLowerCase());
+    ? currentTabBlogs
+    : currentTabBlogs.filter(b => b.category?.toLowerCase() === selectedCategory.toLowerCase());
 
   const getTimeElapsed = (dateString) => {
     if (!dateString) return 'Just now';
@@ -125,8 +147,8 @@ export default function LiveBlogs() {
 
   // Sort live streams to appear first for editorial presentation
   const sortedBlogs = [...filteredBlogs].sort((a, b) => {
-    const aLive = a.isLive !== false;
-    const bLive = b.isLive !== false;
+    const aLive = isBlogActive(a);
+    const bLive = isBlogActive(b);
     if (aLive && !bLive) return -1;
     if (!aLive && bLive) return 1;
     return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
@@ -175,8 +197,35 @@ export default function LiveBlogs() {
             )}
           </div>
 
+          {/* Live vs Concluded Navigation Tabs */}
+          <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-gray-200 dark:border-gray-800 pt-6">
+            <button
+              onClick={() => setStatusTab('live')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black tracking-wider uppercase transition-all shadow-xs ${
+                statusTab === 'live'
+                  ? 'bg-red-600 text-white shadow-md shadow-red-600/25 ring-2 ring-red-500/50 scale-102'
+                  : 'bg-gray-100 dark:bg-gray-800 text-slate-600 dark:text-gray-300 hover:text-red-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${statusTab === 'live' ? 'bg-white animate-ping' : 'bg-red-500'}`}></span>
+              <span>Live Streams ({activeBlogsList.length})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusTab('archive')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black tracking-wider uppercase transition-all shadow-xs ${
+                statusTab === 'archive'
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md ring-2 ring-slate-700/50 scale-102'
+                  : 'bg-gray-100 dark:bg-gray-800 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Concluded Archives ({concludedBlogsList.length})</span>
+            </button>
+          </div>
+
           {/* Sleek Category Filter Bar */}
-          <div className="mt-8 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-t border-gray-200 dark:border-gray-800 pt-6">
+          <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none pt-2">
             <span className="text-xs font-extrabold text-slate-500 dark:text-gray-400 uppercase tracking-wider mr-2 flex items-center gap-1.5 shrink-0 font-mono">
               <Filter className="w-3.5 h-3.5 text-red-600 dark:text-red-500" /> TOPICS:
             </span>
@@ -210,16 +259,20 @@ export default function LiveBlogs() {
         ) : filteredBlogs.length === 0 ? (
           <div className="bg-white dark:bg-[#111827] rounded-3xl border border-gray-200 dark:border-gray-800 p-16 text-center max-w-xl mx-auto my-12 shadow-md">
             <Radio className="w-16 h-16 text-red-600/30 dark:text-red-500/30 mx-auto mb-5 animate-pulse" />
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white font-serif mb-2">No Active Streams Found</h3>
-            <p className="text-sm text-slate-600 dark:text-gray-300 mb-8 leading-relaxed">
-              There are currently no active live broadcasts in the <span className="text-slate-900 dark:text-white font-bold">{selectedCategory}</span> category. Check back shortly as our editorial staff monitors ongoing stories.
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white font-serif mb-2">
+              {statusTab === 'live' ? 'No Active Live Streams' : 'No Concluded Events Found'}
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-gray-300 mb-6 leading-relaxed">
+              {statusTab === 'live' 
+                ? 'All live broadcasts have concluded. Our autonomous scanner monitors outside world cricket, sports, and breaking feeds continuously every 60 seconds.'
+                : 'No archived events found matching this topic filter.'}
             </p>
-            {selectedCategory !== 'All' && (
+            {statusTab === 'live' && concludedBlogsList.length > 0 && (
               <button
-                onClick={() => setSelectedCategory('All')}
+                onClick={() => setStatusTab('archive')}
                 className="bg-slate-900 dark:bg-red-600 hover:bg-slate-800 dark:hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider px-8 py-3 rounded-xl transition-all shadow-sm"
               >
-                Show All Coverage
+                View Concluded Coverage ({concludedBlogsList.length})
               </button>
             )}
           </div>
@@ -227,16 +280,18 @@ export default function LiveBlogs() {
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
               <h3 className="text-xl font-extrabold text-slate-900 dark:text-white font-serif tracking-tight flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-600 dark:bg-red-500 animate-pulse"></span>
-                Active Newsroom Streams & Coverage
+                <span className={`w-2.5 h-2.5 rounded-full ${statusTab === 'live' ? 'bg-red-600 dark:bg-red-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                {statusTab === 'live' ? 'Active Newsroom Streams & Coverage' : 'Concluded Archives & Past Coverage'}
               </h3>
-              <span className="text-xs font-mono font-bold text-slate-500 dark:text-gray-400 uppercase">{sortedBlogs.length} STREAMS ACTIVE</span>
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-gray-400 uppercase">
+                {sortedBlogs.length} {statusTab === 'live' ? 'STREAMS ACTIVE' : 'EVENTS RECORDED'}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
               {sortedBlogs.map((blog) => {
                 const isSaved = savedIds.includes(blog._id);
-                const isLive = blog.isLive !== false;
+                const isLive = isBlogActive(blog);
                 const latestBulletin = blog.updates && blog.updates.length > 0 ? blog.updates[0] : null;
 
                 return (
@@ -353,9 +408,15 @@ export default function LiveBlogs() {
                     {/* Card Footer */}
                     <div className="px-6 py-4 shrink-0 bg-slate-50 dark:bg-gray-800/40 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs font-extrabold text-slate-700 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400 group-hover:bg-slate-100/70 dark:group-hover:bg-gray-800/70 transition-colors">
                       <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 animate-ping"></span>
-                        <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 absolute"></span>
-                        <span className="ml-4 uppercase font-mono tracking-wider text-[11px]">Join Stream</span>
+                        {isLive && (
+                          <>
+                            <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 animate-ping"></span>
+                            <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 absolute"></span>
+                          </>
+                        )}
+                        <span className={`uppercase font-mono tracking-wider text-[11px] ${isLive ? 'ml-4 text-red-600 dark:text-red-400 font-black' : 'text-slate-600 dark:text-gray-400'}`}>
+                          {isLive ? 'Join Live Stream' : 'View Archive'}
+                        </span>
                       </span>
                       <ArrowUpRight className="w-4 h-4 text-slate-500 dark:text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                     </div>

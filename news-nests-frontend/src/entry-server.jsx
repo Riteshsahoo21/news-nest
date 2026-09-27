@@ -6,6 +6,7 @@ import { Writable } from 'stream';
 import App from './App.jsx';
 
 export function render(url) {
+  const normalizedUrl = url ? (url.startsWith('/') ? url : '/' + url) : '/';
   return new Promise((resolve, reject) => {
     const helmetContext = {};
     let html = '';
@@ -13,7 +14,7 @@ export function render(url) {
     const { pipe } = renderToPipeableStream(
       <StrictMode>
         <HelmetProvider context={helmetContext}>
-          <StaticRouter location={url}>
+          <StaticRouter location={normalizedUrl}>
             <App helmetContext={helmetContext} />
           </StaticRouter>
         </HelmetProvider>

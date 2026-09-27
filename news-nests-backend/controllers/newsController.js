@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import axios from 'axios';
 import News from '../models/News.js';
 import Comment from '../models/Comment.js';
@@ -261,10 +262,38 @@ export const getNewsById = async (req, res) => {
     // Fetch the news first to get its ID
     let news = await News.findOne(query)
       .populate('likes', 'fullName')
-      .populate('relatedArticles', 'title slug subtitle imageUrl mainImageUrl publishedAt');
+      .populate('relatedArticles', 'title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
     
     if (!news) {
       return res.status(404).json({ error: 'News article not found' });
+    }
+
+    // Defensive auto-enrichment: If relatedArticles is empty or has fewer than 2 items, auto-populate from category
+    if (!news.relatedArticles || news.relatedArticles.length < 2) {
+      try {
+        const companionNews = await News.find({
+          _id: { $ne: news._id },
+          status: 'approved',
+          category: news.category ? news.category.toLowerCase() : 'general'
+        })
+          .sort({ publishedAt: -1, createdAt: -1 })
+          .limit(3)
+          .select('title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
+
+        if (companionNews.length > 0) {
+          news.relatedArticles = companionNews;
+          News.updateOne({ _id: news._id }, { $set: { relatedArticles: companionNews.map(c => c._id) } }).catch(() => {});
+        }
+      } catch (relErr) {
+        console.error('Error enriching related articles in getNewsById:', relErr);
+      }
+    }
+
+    // If backstory is missing, auto-generate from top related article context
+    if ((!news.backstory || !news.backstory.trim()) && news.relatedArticles && news.relatedArticles.length > 0) {
+      const topTitle = news.relatedArticles[0]?.title || '';
+      news.backstory = `The Backstory: This development builds upon earlier coverage of '${topTitle}'. Historical context and ongoing developments remain actively tracked.`;
+      News.updateOne({ _id: news._id }, { $set: { backstory: news.backstory } }).catch(() => {});
     }
 
     // The enrichment service decides whether body, media or summary details are
@@ -776,8 +805,19 @@ export const getRelatedNews = async (req, res) => {
       filter.category = category.toLowerCase();
     }
 
-    // Fetch related articles
-    let relatedNews = await News.find(filter).sort({ createdAt: -1 }).limit(3).select('title slug imageUrl createdAt');
+    // If articleId is given, check if it already has rich vector companion relatedArticles
+    if (articleId && mongoose.isValidObjectId(articleId)) {
+      const parent = await News.findById(articleId).populate('relatedArticles', 'title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
+      if (parent && parent.relatedArticles && parent.relatedArticles.length > 0) {
+        return res.json(parent.relatedArticles);
+      }
+    }
+
+    // Fetch related articles with rich fields
+    let relatedNews = await News.find(filter)
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(3)
+      .select('title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
     
     // If not enough related news by tags, fallback to category
     if (relatedNews.length < 3 && category && queryTags.length > 0) {
@@ -788,7 +828,10 @@ export const getRelatedNews = async (req, res) => {
         _id: { $nin: excludeIds },
         status: 'approved',
         category: category.toLowerCase()
-      }).sort({ createdAt: -1 }).limit(3 - relatedNews.length).select('title slug imageUrl createdAt');
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(3 - relatedNews.length)
+        .select('title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
       
       relatedNews = [...relatedNews, ...moreNews];
     }

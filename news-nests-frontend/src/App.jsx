@@ -82,6 +82,8 @@ function App({ helmetContext = {} }) {
             <Route path="/" element={<Home />} />
             <Route path="/article/:id" element={<ArticleDetails />} />
             <Route path="/live-blogs" element={<LiveBlogs />} />
+            <Route path="/live-blogs/:id" element={<LiveBlogs />} />
+            <Route path="/live-blog/:id" element={<LiveBlogs />} />
             <Route path="/live-blog-studio" element={<LiveBlogStudio />} />
             <Route path="/videos" element={<Videos />} />
             <Route path="/photo-gallery" element={<PhotoGallery />} />

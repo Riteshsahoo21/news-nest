@@ -202,12 +202,12 @@ export default function Videos() {
         </div>
 
         {/* Sticky Mobile Horizon Topic Filter Bar */}
-        <div className="sticky top-[54px] sm:top-16 z-30 bg-background/95 backdrop-blur-md py-3 -mx-4 px-4 border-b border-border/60 flex overflow-x-auto space-x-2 hide-scrollbar shadow-sm w-[calc(100%+2rem)] max-w-[100vw]">
+        <div className="sticky top-[54px] sm:top-16 z-30 bg-background/95 backdrop-blur-md py-2.5 px-0 border-b border-border/60 flex overflow-x-auto space-x-2 hide-scrollbar shadow-xs w-full max-w-full">
           {CATEGORIES.map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-extrabold transition-all duration-200 shrink-0 border ${
+              className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 shrink-0 border ${
                 activeCategory === cat 
                 ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-600/20 scale-105 font-mono' 
                 : 'bg-muted/70 text-foreground border-border/50 hover:bg-muted font-sans'
@@ -221,8 +221,8 @@ export default function Videos() {
         </div>
 
         {loading ? (
-           <div className="flex flex-col items-center justify-center py-24 space-y-3">
-             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600"></div>
+           <div className="flex flex-col items-center justify-center py-20 space-y-3">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
              <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-bold">Loading Broadcasts...</span>
            </div>
         ) : filteredVideos.length === 0 ? (
@@ -230,15 +230,15 @@ export default function Videos() {
              No video reports available in this category.
            </div>
         ) : (
-          <div className="pt-4 space-y-10 w-full min-w-0">
+          <div className="pt-3 space-y-7 w-full min-w-0">
             
-            {/* 1. MOBILE SPOTLIGHT HERO (Edge-to-Edge Editorial Feature) */}
+            {/* 1. MOBILE SPOTLIGHT HERO */}
             {featuredVideo && (
               <div 
-                className="w-full min-w-0 cursor-pointer group flex flex-col pt-1 pb-6 border-b border-border/60"
+                className="w-full min-w-0 cursor-pointer group flex flex-col pb-5 border-b border-border/60"
                 onClick={() => handleVideoClick(featuredVideo._id)}
               >
-                <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="inline-flex items-center bg-red-600/15 text-red-600 dark:text-red-400 border border-red-600/25 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md uppercase tracking-widest font-mono">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-600 mr-1.5 animate-pulse"></span>
                     ★ SPOTLIGHT BROADCAST
@@ -248,42 +248,42 @@ export default function Videos() {
                   </span>
                 </div>
 
-                <h2 className="text-2xl font-black font-serif leading-tight text-foreground my-2 break-words tracking-tight">
+                <h2 className="text-lg sm:text-xl font-black font-serif leading-snug text-foreground my-1.5 break-words tracking-tight group-hover:text-red-600 transition-colors">
                   {featuredVideo.title}
                 </h2>
 
-                <div className="relative w-[calc(100%+2rem)] -mx-4 aspect-[16/9] bg-black overflow-hidden my-3 shadow-md">
+                <div className="relative w-full rounded-2xl aspect-[16/9] bg-black overflow-hidden my-2.5 shadow-md border border-border/50">
                   <img 
                     src={featuredVideo.thumbnailUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1280&h=720&fit=crop'} 
                     alt={featuredVideo.title}
-                    className="w-full h-full object-cover opacity-95"
+                    className="w-full h-full object-cover opacity-95 group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/30" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-14 h-14 bg-red-600/95 text-white rounded-full flex items-center justify-center pl-1 shadow-2xl scale-100 group-active:scale-95 transition-transform">
-                      <Play className="w-7 h-7 fill-current" />
+                    <div className="w-12 h-12 bg-red-600 text-white rounded-full flex items-center justify-center pl-1 shadow-2xl scale-100 group-active:scale-95 transition-transform">
+                      <Play className="w-6 h-6 fill-current" />
                     </div>
                   </div>
                   {featuredVideo.duration && (
-                    <div className="absolute bottom-3 right-3 bg-black/85 px-2 py-0.5 rounded text-white text-[11px] font-bold tracking-wider font-mono">
+                    <div className="absolute bottom-2.5 right-2.5 bg-black/85 px-2 py-0.5 rounded text-white text-[10px] font-bold tracking-wider font-mono">
                       {featuredVideo.duration}
                     </div>
                   )}
-                  <div className="absolute bottom-3 left-3 text-white text-[11px] font-semibold font-sans drop-shadow-md">
+                  <div className="absolute bottom-2.5 left-2.5 text-white text-[10px] font-semibold font-sans drop-shadow-md">
                     {formatViews(featuredVideo.views || 0)}
                   </div>
                 </div>
 
                 {featuredVideo.subtitle && (
-                  <p className="text-sm font-medium text-muted-foreground leading-relaxed my-2 break-words">
+                  <p className="text-xs text-muted-foreground leading-relaxed my-1.5 line-clamp-2">
                     {featuredVideo.subtitle}
                   </p>
                 )}
 
-                {/* Reporter attribution bar with quick interaction tools */}
-                <div className="flex items-center justify-between pt-3 mt-1 border-t border-border/30">
+                {/* Reporter attribution bar */}
+                <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-border/30">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-red-600/15 border border-red-500/20 text-red-600 font-extrabold text-xs flex items-center justify-center shrink-0 font-mono">
+                    <div className="w-6 h-6 rounded-full bg-red-600/15 border border-red-500/20 text-red-600 font-extrabold text-[11px] flex items-center justify-center shrink-0 font-mono">
                       {(featuredVideo.reporter || 'N')[0]}
                     </div>
                     <span className="text-xs font-bold text-foreground truncate">{featuredVideo.reporter || 'Newsroom Desk'}</span>
@@ -292,44 +292,44 @@ export default function Videos() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button 
                       onClick={(e) => handleQuickSave(e, featuredVideo._id)}
-                      className="p-2 rounded-full bg-muted/60 hover:bg-muted text-foreground transition-all"
+                      className="p-1.5 rounded-full bg-muted/60 hover:bg-muted text-foreground transition-all"
                       aria-label="Bookmark Broadcast"
                     >
-                      <Bookmark className={`w-4 h-4 ${savedVideos[featuredVideo._id] ? 'text-blue-500 fill-blue-500' : ''}`} />
+                      <Bookmark className={`w-3.5 h-3.5 ${savedVideos[featuredVideo._id] ? 'text-blue-500 fill-blue-500' : ''}`} />
                     </button>
                     <button 
                       onClick={(e) => handleQuickShare(e, featuredVideo)}
-                      className="p-2 rounded-full bg-muted/60 hover:bg-muted text-foreground transition-all"
+                      className="p-1.5 rounded-full bg-muted/60 hover:bg-muted text-foreground transition-all"
                       aria-label="Share Broadcast"
                     >
-                      {copiedId === featuredVideo._id ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+                      {copiedId === featuredVideo._id ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Share2 className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 2. MOBILE NEWS SHORTS (Vertical Video Briefs Shelf) */}
+            {/* 2. MOBILE NEWS SHORTS (Vertical 60-sec Briefs) */}
             {shortVideos.length > 0 && activeCategory === 'Trending' && (
-              <div className="bg-neutral-950 text-white p-5 -mx-4 rounded-3xl border border-neutral-800 my-6 shadow-xl w-[calc(100%+2rem)] max-w-[100vw]">
-                <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-800">
+              <div className="bg-neutral-950 text-white p-4 rounded-2xl border border-neutral-800 my-4 shadow-xl w-full">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-neutral-800">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-500 text-lg">⚡</span>
+                    <span className="text-red-500 text-base">⚡</span>
                     <div>
-                      <h3 className="font-extrabold text-base uppercase font-serif tracking-tight text-white">News Shorts</h3>
+                      <h3 className="font-extrabold text-sm uppercase font-serif tracking-tight text-white">News Shorts</h3>
                       <p className="text-[10px] text-neutral-400 font-mono">60-second video briefs</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono bg-neutral-900 text-red-400 border border-neutral-700 px-2.5 py-1 rounded-full font-bold uppercase">
+                  <span className="text-[9px] font-mono bg-neutral-900 text-red-400 border border-neutral-700 px-2 py-0.5 rounded-full font-bold uppercase">
                     SWIPE →
                   </span>
                 </div>
 
-                <div className="flex overflow-x-auto hide-scrollbar space-x-3.5 pb-2 snap-x">
+                <div className="flex overflow-x-auto hide-scrollbar space-x-3 pb-1 snap-x">
                   {shortVideos.map((video) => (
                     <div
                       key={video._id}
-                      className="relative flex-none w-[145px] aspect-[9/16] shrink-0 bg-neutral-900 rounded-2xl overflow-hidden cursor-pointer snap-start shadow-md border border-neutral-800 group"
+                      className="relative flex-none w-[130px] aspect-[9/16] shrink-0 bg-neutral-900 rounded-xl overflow-hidden cursor-pointer snap-start shadow-md border border-neutral-800 group active:scale-95 transition-transform"
                       onClick={() => handleVideoClick(video._id)}
                     >
                       <img 
@@ -339,18 +339,18 @@ export default function Videos() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent" />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-11 h-11 bg-red-600/90 text-white rounded-full flex items-center justify-center pl-1 shadow-xl opacity-90">
-                          <Play className="w-5 h-5 fill-current" />
+                        <div className="w-9 h-9 bg-red-600/90 text-white rounded-full flex items-center justify-center pl-0.5 shadow-xl">
+                          <Play className="w-4 h-4 fill-current" />
                         </div>
                       </div>
-                      <div className="absolute top-2.5 right-2.5 bg-black/80 backdrop-blur-md text-red-500 font-extrabold text-[9px] px-1.5 py-0.5 rounded uppercase font-mono border border-red-500/20">
+                      <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md text-red-500 font-extrabold text-[8px] px-1 py-0.5 rounded uppercase font-mono border border-red-500/20">
                         SHORT
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 p-3.5 space-y-1">
-                        <h4 className="text-white font-black font-sans text-xs leading-tight drop-shadow-md break-words">
+                      <div className="absolute bottom-0 left-0 right-0 p-2.5 space-y-0.5">
+                        <h4 className="text-white font-bold font-sans text-[11px] leading-tight line-clamp-2 drop-shadow-md">
                           {video.title}
                         </h4>
-                        <p className="text-neutral-300 font-bold text-[10px] font-mono">
+                        <p className="text-neutral-400 font-semibold text-[9px] font-mono">
                           {formatViews(video.views || 0)}
                         </p>
                       </div>
@@ -360,92 +360,72 @@ export default function Videos() {
               </div>
             )}
 
-            {/* 3. MOBILE EDITORIAL VIDEO STREAM WITH CATEGORIES & VIEW ALL */}
-            <div className="space-y-12 w-full min-w-0">
-              {/* Main Feed Section (Trending/Latest/Category) */}
+            {/* 3. MOBILE EDITORIAL FEED */}
+            <div className="space-y-8 w-full min-w-0">
+              {/* Primary Feed Section */}
               <section className="w-full min-w-0">
-                <div className="flex items-center justify-between pb-2.5 border-b border-border/60 mb-5">
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <span className="w-2 h-5 bg-red-600 rounded-full shrink-0"></span>
-                    <h3 className="text-lg font-black uppercase font-serif text-foreground tracking-tight truncate">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60 mb-3.5">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <span className="w-2 h-4 bg-red-600 rounded-full shrink-0"></span>
+                    <h3 className="text-base font-black uppercase font-serif text-foreground tracking-tight truncate">
                       {activeCategory === 'Trending' ? 'Trending Broadcasts' : `${activeCategory} Broadcasts`}
                     </h3>
                   </div>
                   {activeCategory !== 'Trending' && activeCategory !== 'Latest' && (
                     <button 
                       onClick={() => navigate(`/video-category/${activeCategory.toLowerCase()}`)}
-                      className="text-red-600 dark:text-red-500 text-xs font-extrabold uppercase tracking-wider hover:underline flex items-center transition-colors font-mono shrink-0 ml-2"
+                      className="text-red-600 dark:text-red-500 text-[11px] font-bold uppercase tracking-wider hover:underline flex items-center transition-colors font-mono shrink-0 ml-2"
                     >
-                      View All <ChevronRight className="w-4 h-4 ml-0.5" />
+                      View All <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-8 w-full min-w-0">
-                  {(activeCategory === 'Trending' || activeCategory === 'Latest' ? regularVideos.slice(0, 5) : regularVideos).map((video) => (
+                {/* Compact Modern Media Rows */}
+                <div className="divide-y divide-border/40">
+                  {(activeCategory === 'Trending' || activeCategory === 'Latest' ? regularVideos.slice(0, 6) : regularVideos).map((video) => (
                     <div 
                       key={video._id} 
-                      className="w-full min-w-0 cursor-pointer flex flex-col pb-6 border-b border-border/50 group"
+                      className="flex items-center gap-3 py-3 w-full cursor-pointer group active:bg-muted/30 transition-colors"
                       onClick={() => handleVideoClick(video._id)}
                     >
-                      {/* Top Metadata row */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="bg-red-600/10 text-red-600 dark:text-red-400 font-mono font-black text-[11px] uppercase tracking-wider px-2 py-0.5 rounded border border-red-600/20 truncate">
-                          {video.category || 'BROADCAST'}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-[11px] font-mono font-medium text-muted-foreground shrink-0">
-                          <span>{formatViews(video.views || 0)}</span>
-                          <span>•</span>
-                          <span>{timeAgo(video.createdAt)}</span>
-                        </div>
-                      </div>
-
-                      {/* Unabridged Readable Headline (No truncation!) */}
-                      <h3 className="text-lg sm:text-xl font-black font-serif leading-snug text-foreground my-1.5 break-words tracking-tight group-active:text-red-600 transition-colors">
-                        {video.title}
-                      </h3>
-
-                      {/* Cinematic 16:9 Thumbnail Window */}
-                      <div className="relative w-full aspect-[16/9] rounded-2xl bg-black overflow-hidden my-3 shadow-md border border-border/40">
+                      {/* 16:9 Left Thumbnail */}
+                      <div className="relative w-28 sm:w-32 h-18 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-black shadow-xs border border-border/50">
                         <img 
                           src={video.thumbnailUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop'} 
                           alt={video.title}
-                          className="w-full h-full object-cover opacity-95"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
-                        <div className="absolute inset-0 bg-black/25" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center pl-1 shadow-xl">
-                            <Play className="w-6 h-6 fill-current" />
+                        <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-red-600/90 text-white flex items-center justify-center pl-0.5 shadow">
+                            <Play className="w-3.5 h-3.5 fill-current" />
                           </div>
                         </div>
                         {video.duration && (
-                          <div className="absolute bottom-2.5 right-2.5 bg-black/85 px-2.5 py-1 rounded text-white text-xs font-extrabold font-mono">
+                          <span className="absolute bottom-1 right-1 bg-black/85 text-[8px] font-mono text-white px-1 py-0.2 rounded font-bold">
                             {video.duration}
-                          </div>
+                          </span>
                         )}
                       </div>
 
-                      {/* Reporter Attribution and Interaction Row */}
-                      <div className="flex items-center justify-between pt-2 mt-1 w-full min-w-0">
-                        <span className="text-xs font-bold text-muted-foreground truncate">
-                          Reported by <span className="text-foreground">{video.reporter || 'Newsroom Desk'}</span>
-                        </span>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button 
-                            onClick={(e) => handleQuickSave(e, video._id)}
-                            className="p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground transition-all"
-                            aria-label="Save Broadcast"
-                          >
-                            <Bookmark className={`w-3.5 h-3.5 ${savedVideos[video._id] ? 'text-blue-500 fill-blue-500' : ''}`} />
-                          </button>
-                          <button 
-                            onClick={(e) => handleQuickShare(e, video)}
-                            className="p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground transition-all"
-                            aria-label="Share Broadcast"
-                          >
-                            {copiedId === video._id ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Share2 className="w-3.5 h-3.5" />}
-                          </button>
+                      {/* Right Details */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[9px] font-mono font-bold text-red-600 uppercase bg-red-600/10 px-1.5 py-0.5 rounded border border-red-600/20 truncate">
+                              {video.category || 'BROADCAST'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono truncate">
+                              • {timeAgo(video.createdAt)}
+                            </span>
+                          </div>
+                          <h4 className="font-bold font-serif text-xs sm:text-sm text-foreground leading-snug line-clamp-2 group-hover:text-red-600 transition-colors">
+                            {video.title}
+                          </h4>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-sans mt-1 flex items-center justify-between">
+                          <span className="truncate max-w-[120px]">{video.reporter || 'News Desk'}</span>
+                          <span className="font-mono text-foreground/80">{formatViews(video.views || 0)}</span>
                         </div>
                       </div>
                     </div>
@@ -453,94 +433,61 @@ export default function Videos() {
                 </div>
               </section>
 
-              {/* Mobile Category Sections with View All Button */}
+              {/* Category Shelves with Horizontal Scrollable Rows */}
               {(activeCategory === 'Trending' || activeCategory === 'Latest') && (
-                <div className="space-y-12 pt-2 w-full min-w-0">
+                <div className="space-y-7 pt-1 w-full min-w-0">
                   {CATEGORIES.filter(c => c !== 'Latest' && c !== 'Trending').map(cat => {
-                    const catVideos = regularVideos.filter(v => (v.category || '').toLowerCase() === cat.toLowerCase()).slice(0, 4);
+                    const catVideos = regularVideos.filter(v => (v.category || '').toLowerCase() === cat.toLowerCase()).slice(0, 5);
                     if (catVideos.length === 0) return null;
                     return (
                       <section key={cat} className="w-full min-w-0">
-                        <div className="flex items-center justify-between pb-2.5 border-b border-border/60 mb-5 w-full min-w-0">
-                          <div className="flex items-center space-x-2.5 min-w-0">
-                            <span className="w-2 h-5 bg-red-600 rounded-full shrink-0"></span>
-                            <h3 className="text-lg font-black uppercase font-serif text-foreground tracking-tight truncate">
-                              {cat} Broadcasts
+                        <div className="flex items-center justify-between pb-2 border-b border-border/60 mb-3 w-full min-w-0">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <span className="w-2 h-4 bg-red-600 rounded-full shrink-0"></span>
+                            <h3 className="text-sm font-black uppercase font-serif text-foreground tracking-tight truncate">
+                              {cat}
                             </h3>
                           </div>
                           <button 
                             onClick={() => navigate(`/video-category/${cat.toLowerCase()}`)}
-                            className="text-red-600 dark:text-red-500 text-xs font-extrabold uppercase tracking-wider hover:underline flex items-center transition-colors font-mono shrink-0 ml-2"
+                            className="text-red-600 dark:text-red-500 text-[11px] font-bold uppercase tracking-wider hover:underline flex items-center transition-colors font-mono shrink-0 ml-2"
                           >
-                            View All <ChevronRight className="w-4 h-4 ml-0.5" />
+                            All <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                           </button>
                         </div>
 
-                        <div className="space-y-8 w-full min-w-0">
+                        {/* Swipeable Category Carousel */}
+                        <div className="flex overflow-x-auto hide-scrollbar space-x-3 pb-1 snap-x">
                           {catVideos.map((video) => (
                             <div 
                               key={video._id} 
-                              className="w-full min-w-0 cursor-pointer flex flex-col pb-6 border-b border-border/50 group"
+                              className="relative flex-none w-[200px] bg-card rounded-xl overflow-hidden cursor-pointer snap-start shadow-xs border border-border/60 group active:scale-95 transition-transform"
                               onClick={() => handleVideoClick(video._id)}
                             >
-                              {/* Top Metadata row */}
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className="bg-red-600/10 text-red-600 dark:text-red-400 font-mono font-black text-[11px] uppercase tracking-wider px-2 py-0.5 rounded border border-red-600/20 truncate">
-                                  {video.category || cat}
-                                </span>
-                                <div className="flex items-center gap-1.5 text-[11px] font-mono font-medium text-muted-foreground shrink-0">
-                                  <span>{formatViews(video.views || 0)}</span>
-                                  <span>•</span>
-                                  <span>{timeAgo(video.createdAt)}</span>
-                                </div>
-                              </div>
-
-                              {/* Unabridged Readable Headline */}
-                              <h3 className="text-lg sm:text-xl font-black font-serif leading-snug text-foreground my-1.5 break-words tracking-tight group-active:text-red-600 transition-colors">
-                                {video.title}
-                              </h3>
-
-                              {/* Cinematic 16:9 Thumbnail Window */}
-                              <div className="relative w-full aspect-[16/9] rounded-2xl bg-black overflow-hidden my-3 shadow-md border border-border/40">
+                              <div className="relative w-full aspect-[16/9] bg-black overflow-hidden">
                                 <img 
                                   src={video.thumbnailUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop'} 
                                   alt={video.title}
-                                  className="w-full h-full object-cover opacity-95"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
-                                <div className="absolute inset-0 bg-black/25" />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center pl-1 shadow-xl">
-                                    <Play className="w-6 h-6 fill-current" />
+                                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                  <div className="w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center pl-0.5 shadow">
+                                    <Play className="w-4 h-4 fill-current" />
                                   </div>
                                 </div>
                                 {video.duration && (
-                                  <div className="absolute bottom-2.5 right-2.5 bg-black/85 px-2.5 py-1 rounded text-white text-xs font-extrabold font-mono">
+                                  <span className="absolute bottom-1 right-1 bg-black/85 text-[8px] font-mono text-white px-1 py-0.2 rounded font-bold">
                                     {video.duration}
-                                  </div>
+                                  </span>
                                 )}
                               </div>
-
-                              {/* Reporter Attribution and Interaction Row */}
-                              <div className="flex items-center justify-between pt-2 mt-1 w-full min-w-0">
-                                <span className="text-xs font-bold text-muted-foreground truncate">
-                                  Reported by <span className="text-foreground">{video.reporter || 'Newsroom Desk'}</span>
-                                </span>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button 
-                                    onClick={(e) => handleQuickSave(e, video._id)}
-                                    className="p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground transition-all"
-                                    aria-label="Save Broadcast"
-                                  >
-                                    <Bookmark className={`w-3.5 h-3.5 ${savedVideos[video._id] ? 'text-blue-500 fill-blue-500' : ''}`} />
-                                  </button>
-                                  <button 
-                                    onClick={(e) => handleQuickShare(e, video)}
-                                    className="p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground transition-all"
-                                    aria-label="Share Broadcast"
-                                  >
-                                    {copiedId === video._id ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Share2 className="w-3.5 h-3.5" />}
-                                  </button>
+                              <div className="p-2.5">
+                                <h4 className="font-bold font-serif text-xs text-foreground leading-snug line-clamp-2 group-hover:text-red-600 transition-colors">
+                                  {video.title}
+                                </h4>
+                                <div className="mt-1.5 flex items-center justify-between text-[9px] text-muted-foreground font-mono">
+                                  <span>{timeAgo(video.createdAt)}</span>
+                                  <span>{formatViews(video.views || 0)}</span>
                                 </div>
                               </div>
                             </div>

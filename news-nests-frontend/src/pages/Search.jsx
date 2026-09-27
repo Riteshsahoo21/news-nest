@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Search as SearchIcon, ArrowLeft, PlayCircle, Image as ImageIcon, FileText, Radio } from 'lucide-react';
+import { Search as SearchIcon, ArrowLeft, PlayCircle, Image as ImageIcon, FileText, Radio, Sparkles, TrendingUp } from 'lucide-react';
 import api from '../services/api';
 import EditorsPick from '../components/home/EditorsPick';
+import RelatedNewsSection from '../components/RelatedNewsSection';
 import { Input } from '../components/ui/input';
 
 const EMPTY_RESULTS = { news: [], liveBlogs: [], videos: [], photoGalleries: [] };
@@ -19,9 +20,25 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [refreshingLive, setRefreshingLive] = useState(false);
   const [error, setError] = useState('');
+  const [recommendations, setRecommendations] = useState([]);
+  const [trendingTopics, setTrendingTopics] = useState([]);
   const latestRequestId = useRef(0);
   const liveRefreshTimer = useRef(null);
   const livePollCount = useRef(0);
+
+  useEffect(() => {
+    // Fetch curated search recommendations and trending topics
+    const fetchRecommendations = async () => {
+      try {
+        const res = await api.get('/search/recommendations');
+        setRecommendations(res.data.recommendations || []);
+        setTrendingTopics(res.data.trendingTopics || []);
+      } catch (err) {
+        console.error('Error fetching search recommendations:', err);
+      }
+    };
+    fetchRecommendations();
+  }, []);
   
   useEffect(() => {
     if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current);
@@ -69,6 +86,9 @@ export default function Search() {
         ? { ...current, news: [...(current.news || []), ...(nextResults.news || [])] }
         : nextResults
       );
+      if (res.data.results?.recommendations && res.data.results.recommendations.length > 0) {
+        setRecommendations(res.data.results.recommendations);
+      }
       setTotalMatches(res.data.totalMatches || 0);
       setNewsPagination(res.data.pagination?.news || { page, hasMore: false, total: nextResults.news.length });
       if (page === 1) scheduleLiveRefresh(searchQuery, res.data.discovery);
@@ -273,15 +293,89 @@ export default function Search() {
 
             </div>
           ) : (
-            <div className="text-center py-20 bg-muted/50 rounded-2xl border border-dashed border-border mt-4">
-              <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2">No results found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                {refreshingLive
-                  ? 'No saved matches yet. Live publishers are being checked now.'
-                  : "We couldn't find any articles, videos, or galleries matching your search terms. Try using different keywords."}
-              </p>
+            <div className="space-y-8">
+              <div className="text-center py-14 bg-muted/40 rounded-2xl border border-dashed border-border mt-4">
+                <SearchIcon className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <h3 className="text-lg font-bold mb-1">No direct matches found</h3>
+                <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+                  {refreshingLive
+                    ? 'Checking live publishers for newer matches…'
+                    : `We couldn't find exact matches for "${initialQuery}". Explore our recommended coverage below:`}
+                </p>
+                {trendingTopics.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl mx-auto px-4">
+                    {trendingTopics.slice(0, 5).map((topic, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setQuery(topic);
+                          navigate(`/search?q=${encodeURIComponent(topic)}`);
+                        }}
+                        className="text-xs bg-card border border-border px-3 py-1.5 rounded-full hover:border-primary/50 hover:text-primary transition-colors"
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Recommended Stories when search is empty */}
+              {recommendations.length > 0 && (
+                <RelatedNewsSection 
+                  articles={recommendations} 
+                  variant="grid" 
+                  title="Recommended Stories For You" 
+                />
+              )}
             </div>
+          )}
+
+          {/* Recommended Past Stories when results exist */}
+          {totalResults > 0 && recommendations.length > 0 && (
+            <RelatedNewsSection 
+              articles={recommendations} 
+              variant="grid" 
+              title="Recommended Companion Stories" 
+            />
+          )}
+        </div>
+      )}
+
+      {/* Zero Search State: Show Trending Topics and Recommendations */}
+      {!loading && !initialQuery && (
+        <div className="space-y-10 mt-6">
+          {trendingTopics.length > 0 && (
+            <div className="bg-muted/30 border border-border/70 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <span>Trending Discovery Topics</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {trendingTopics.map((topic, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setQuery(topic);
+                      navigate(`/search?q=${encodeURIComponent(topic)}`);
+                    }}
+                    className="text-xs sm:text-sm font-medium bg-card border border-border px-4 py-2 rounded-xl hover:border-primary/60 hover:text-primary transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <span>{topic}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {recommendations.length > 0 && (
+            <RelatedNewsSection 
+              articles={recommendations} 
+              variant="grid" 
+              title="Recommended Coverage For You" 
+            />
           )}
         </div>
       )}

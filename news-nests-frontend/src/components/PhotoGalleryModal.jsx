@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bookmark, Image as ImageIcon, Heart, Send, Trash2, Ban } from 'lucide-react';
+import { ArrowLeft, Bookmark, Image as ImageIcon, Heart, Send, Trash2, Ban, ExternalLink, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,8 @@ import CommentThread, { buildCommentTree } from './CommentThread';
 import SafeImage from './common/SafeImage';
 
 export default function PhotoGalleryModal({ galleryId, onClose }) {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [gallery, setGallery] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -321,15 +324,19 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
               </div>
             )}
 
-            {/* Description */}
+            {/* Editorial Description */}
             <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none mb-10">
-              <p className="text-foreground/90 font-sans leading-relaxed whitespace-pre-wrap text-base md:text-lg border-l-4 border-red-600 pl-4 py-1">
-                {gallery.description}
-              </p>
+              <div className="text-foreground/90 font-sans leading-relaxed text-base sm:text-lg border-l-4 border-red-600 pl-4 py-2 space-y-4">
+                {gallery.description.split('\n\n').map((paragraph, pIdx) => (
+                  <p key={pIdx} className="leading-relaxed">
+                    {paragraph.trim()}
+                  </p>
+                ))}
+              </div>
             </div>
 
             {/* Dynamically Adjusting Photo Grid */}
-            <div className={`grid gap-4 md:gap-6 mb-12 ${gallery.photos?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+            <div className={`grid gap-4 md:gap-6 mb-10 ${gallery.photos?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
               {gallery.photos?.map((photo, index) => {
                 const isSingle = gallery.photos.length === 1;
                 const isFeaturedOdd = !isSingle && gallery.photos.length % 2 === 1 && index === 0;
@@ -359,37 +366,77 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
               })}
             </div>
 
-            {/* Related News Section */}
-            {relatedNews.length > 0 && (
-              <div className="mt-10 pt-8 border-t border-border/50 max-w-4xl mx-auto px-4 w-full">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                  <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
-                  Related Photo Galleries
-                </h3>
-                <div className="flex flex-col space-y-4">
-                  {relatedNews.map((news) => (
-                    <div key={news._id} className="group relative">
+            {/* Related News Articles Coverage */}
+            {gallery.relatedNews && gallery.relatedNews.length > 0 && (
+              <div className="mb-10 p-5 rounded-2xl bg-muted/30 border border-border/60">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="w-2 h-5 bg-red-600 rounded-full inline-block"></span>
+                  <h3 className="text-base sm:text-lg font-black font-serif text-foreground uppercase tracking-tight">
+                    Related News & In-Depth Reports
+                  </h3>
+                </div>
+                <ul className="divide-y divide-border/40">
+                  {gallery.relatedNews.map((item, idx) => (
+                    <li key={idx} className="py-2.5 first:pt-0 last:pb-0">
                       <a 
-                      key={news._id}
-                      href={`?galleryId=${news.slug || news._id}`}
-                      className="block group bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-red-100 hover:shadow-xl transition-all duration-300"
-                      onClick={(e) => {
-                          // Handle navigation
+                        href={item.url} 
+                        onClick={(e) => {
+                          if (item.url && item.url.startsWith('/')) {
+                            e.preventDefault();
+                            onClose?.();
+                            navigate(item.url);
+                          }
                         }}
+                        className="group flex items-start gap-2.5 text-foreground hover:text-red-600 transition-colors"
                       >
-                        <div className="flex items-center gap-4">
-                          <SafeImage 
-                            src={news.imageUrl || news.mainImageUrl} 
-                            alt={news.title} 
-                            category={news.category}
-                            className="w-20 h-20 object-cover rounded-lg flex-shrink-0" 
-                          />
-                          <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors line-clamp-2">
+                        <span className="text-red-600 font-black text-lg leading-none mt-0.5">•</span>
+                        <span className="font-semibold text-sm sm:text-base font-serif group-hover:underline leading-snug flex-1">
+                          {item.title}
+                        </span>
+                        <ExternalLink className="w-4 h-4 text-muted-foreground opacity-60 group-hover:opacity-100 shrink-0 mt-0.5" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Related Photo Galleries */}
+            {relatedNews.length > 0 && (
+              <div className="mt-8 pt-8 border-t border-border/50 w-full">
+                <h3 className="text-lg sm:text-xl font-black font-serif mb-5 flex items-center gap-2">
+                  <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
+                  More Photo Galleries
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {relatedNews.map((news) => (
+                    <button 
+                      key={news._id}
+                      type="button"
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.set('galleryId', news._id);
+                        setSearchParams(newParams);
+                      }}
+                      className="text-left w-full block group bg-card border border-border/60 hover:border-red-500/40 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all p-2.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <SafeImage 
+                          src={news.imageUrl || news.mainImageUrl} 
+                          alt={news.title} 
+                          category={news.category}
+                          className="w-20 h-16 object-cover rounded-lg flex-shrink-0" 
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-foreground group-hover:text-red-600 transition-colors line-clamp-2 font-serif text-xs sm:text-sm">
                             {news.title}
                           </h4>
+                          <span className="text-[11px] font-mono font-bold text-red-600 mt-1 block">
+                            Explore Gallery →
+                          </span>
                         </div>
-                      </a>
-                    </div>
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>

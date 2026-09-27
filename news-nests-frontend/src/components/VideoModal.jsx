@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ThumbsUp, Heart, Bookmark, Share2, Download, Send, Trash2, Ban, Check, X } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, Heart, Bookmark, Share2, Download, Send, Trash2, Ban, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { formatViews, timeAgo } from '../pages/Videos';
 import { useAuth } from '../context/AuthContext';
@@ -8,13 +9,26 @@ import AdSlot from './ads/AdSlot';
 import CommentThread, { buildCommentTree } from './CommentThread';
 import SafeImage from './common/SafeImage';
 
+export const getCleanYouTubeEmbedUrl = (url, autoplay = true) => {
+  if (!url) return '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/)([^#&?]*).*/;
+  const match = url.match(regExp);
+  const vId = (match && match[2].length === 11) ? match[2] : null;
+  if (vId) {
+    return `https://www.youtube-nocookie.com/embed/${vId}?autoplay=${autoplay ? 1 : 0}&playsinline=1&rel=0&modestbranding=1`;
+  }
+  return url;
+};
+
 export default function VideoModal({ videoId, onClose }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [relatedNews, setRelatedNews] = useState([]);
+  const [showFullDesc, setShowFullDesc] = useState(false);
   const { user } = useAuth();
   
   const isStaff = user?.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
@@ -304,16 +318,17 @@ export default function VideoModal({ videoId, onClose }) {
               {video.videoUrl?.includes('youtube.com') || video.videoUrl?.includes('youtu.be') ? (
                 <iframe 
                   className="w-full h-full"
-                  src={showInterstitial ? '' : `${video.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/').replace('youtube.com/live/', 'youtube.com/embed/')}?autoplay=1`}
+                  src={showInterstitial ? '' : getCleanYouTubeEmbedUrl(video.videoUrl, true)}
                   title={video.title}
                   frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                 ></iframe>
               ) : (
                 <video 
                   className="w-full h-full object-contain"
                   controls
+                  playsInline
                   autoPlay={!showInterstitial}
                   src={video.videoUrl}
                 ></video>
@@ -328,38 +343,51 @@ export default function VideoModal({ videoId, onClose }) {
 
         {/* Mobile Unified Stream (Metadata + Actions + Ad + Comments in one seamless flow) */}
         {video && !loading && (
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 pb-24 w-full max-w-full min-w-0">
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 pb-24 w-full max-w-full min-w-0">
             {/* Title & Stats */}
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="bg-red-600/10 text-red-600 font-extrabold text-[10px] uppercase tracking-widest px-2 py-0.5 rounded border border-red-600/20 font-mono">
+                <span className="bg-red-600/10 text-red-600 font-extrabold text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded border border-red-600/20 font-mono">
                   {video.category || 'NEWS'}
                 </span>
-                <span className="text-xs font-semibold text-foreground/80 bg-muted px-2 py-0.5 rounded">
+                <span className="text-xs font-semibold text-foreground/80 bg-muted px-2.5 py-0.5 rounded">
                   {formatViews(video.views || 0)}
                 </span>
                 <span className="text-xs font-medium text-muted-foreground">
                   {timeAgo(video.createdAt)}
                 </span>
               </div>
-              <h1 className="text-xl font-black leading-snug text-foreground font-serif tracking-tight break-words">
+              <h1 className="text-lg sm:text-xl font-black leading-snug text-foreground font-serif tracking-tight break-words">
                 {video.title}
               </h1>
               
-              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl border border-border/50">
-                <div className="w-10 h-10 rounded-full bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-600 font-extrabold text-lg shrink-0 font-mono">
+              <div className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-xl border border-border/50">
+                <div className="w-9 h-9 rounded-full bg-red-600/15 border border-red-500/20 flex items-center justify-center text-red-600 font-extrabold text-sm shrink-0 font-mono">
                   {(video.reporter || 'N')[0]}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-extrabold mb-0.5 font-mono">Reported by</p>
-                  <p className="font-bold text-sm text-foreground truncate">{video.reporter || 'Newsroom Desk'}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-extrabold font-mono">Reported by</p>
+                  <p className="font-bold text-xs sm:text-sm text-foreground truncate">{video.reporter || 'Newsroom Desk'}</p>
                 </div>
               </div>
 
-              <div className="prose prose-sm dark:prose-invert max-w-none pt-1 mb-2">
-                <p className="text-foreground/90 text-sm leading-relaxed whitespace-pre-wrap font-medium break-words">
+              {/* Description Box with Expandable Toggle */}
+              <div className="bg-muted/20 p-3 rounded-xl border border-border/40">
+                <p className={`text-foreground/90 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans break-words ${!showFullDesc && video.description?.length > 150 ? 'line-clamp-3' : ''}`}>
                   {video.description}
                 </p>
+                {video.description?.length > 150 && (
+                  <button 
+                    onClick={() => setShowFullDesc(!showFullDesc)}
+                    className="text-red-600 text-xs font-bold mt-1.5 flex items-center gap-0.5 hover:underline"
+                  >
+                    {showFullDesc ? (
+                      <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
+                    ) : (
+                      <>Show more <ChevronDown className="w-3.5 h-3.5" /></>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Tags */}
@@ -410,33 +438,39 @@ export default function VideoModal({ videoId, onClose }) {
             {/* Mobile Related News Section */}
             {relatedNews.length > 0 && (
               <div className="pt-6 pb-2 border-t border-border/60 w-full min-w-0">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
-                  Related Videos
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <span className="w-2 h-5 bg-red-600 rounded-sm inline-block"></span>
+                  Related Broadcasts
                 </h3>
-                <div className="flex flex-col space-y-4">
+                <div className="flex flex-col space-y-3">
                   {relatedNews.map((news) => (
-                    <div key={news._id} className="group relative">
-                      <a 
-                        href={`?videoId=${news._id}`} // Opens the modal on current page
-                        className="block p-4 rounded-xl border border-gray-100 hover:border-red-100 hover:bg-red-50/50 transition-all duration-300"
-                        onClick={(e) => {
-                          // Allow standard navigation
-                        }}
-                      >
-                        <div className="flex items-center gap-4">
-                          <SafeImage 
-                            src={news.imageUrl || news.mainImageUrl} 
-                            alt={news.title} 
-                            category={news.category}
-                            className="w-24 h-16 object-cover rounded-lg flex-shrink-0" 
-                          />
-                          <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors line-clamp-2">
-                            {news.title}
-                          </h4>
-                        </div>
-                      </a>
-                    </div>
+                    <button 
+                      key={news._id}
+                      type="button"
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.set('videoId', news._id);
+                        setSearchParams(newParams);
+                      }}
+                      className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl border border-border/50 bg-card hover:bg-muted/40 transition-colors"
+                    >
+                      <SafeImage 
+                        src={news.imageUrl || news.mainImageUrl} 
+                        alt={news.title} 
+                        category={news.category}
+                        className="w-24 h-16 object-cover rounded-lg flex-shrink-0" 
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-foreground group-hover:text-red-600 transition-colors line-clamp-2 text-xs sm:text-sm font-serif">
+                          {news.title}
+                        </h4>
+                        {news.duration && (
+                          <span className="text-[10px] font-mono font-semibold text-muted-foreground mt-1 block">
+                            {news.duration}
+                          </span>
+                        )}
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -548,10 +582,10 @@ export default function VideoModal({ videoId, onClose }) {
                 {video.videoUrl?.includes('youtube.com') || video.videoUrl?.includes('youtu.be') ? (
                   <iframe 
                     className="w-full h-full"
-                    src={showInterstitial ? '' : `${video.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/').replace('youtube.com/live/', 'youtube.com/embed/')}?autoplay=1`}
+                    src={showInterstitial ? '' : getCleanYouTubeEmbedUrl(video.videoUrl, true)}
                     title={video.title}
                     frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   ></iframe>
                 ) : (

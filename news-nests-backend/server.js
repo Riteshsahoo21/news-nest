@@ -31,6 +31,7 @@ import scraperRoutes from './routes/scraperRoutes.js';
 import automationRoutes from './routes/automationRoutes.js';
 import { initQueues } from './workers/newsQueue.js';
 import { initNewsletterCron } from './cron/newsletterScheduler.js';
+import { startLiveBlogContinuousWorker } from './services/liveBlogAutomationService.js';
 import { seedDefaultRoles } from './utils/seedRoles.js';
 import { getGeneralSitemap, getGoogleNewsSitemap, getRssFeed } from './controllers/sitemapController.js';
 import { socialBotInterceptor } from './middleware/socialBotInterceptor.js';
@@ -164,6 +165,7 @@ server.listen(PORT, '0.0.0.0', () => {
   // Initialize BullMQ Queues (replaces initCronJobs)
   initQueues();
   initNewsletterCron();
+  startLiveBlogContinuousWorker();
 
   // Error handling middleware
 });

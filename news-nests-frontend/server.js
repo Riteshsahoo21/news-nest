@@ -31,9 +31,17 @@ async function createServer() {
     }));
   }
 
+  // Guard static assets from falling through to SSR HTML handler
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/assets/') || req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|map|json)$/)) {
+      return res.status(404).send('Asset not found');
+    }
+    next();
+  });
+
   app.use(async (req, res, next) => {
     try {
-      const url = req.originalUrl.replace(base, '');
+      const url = req.originalUrl;
 
       let template, render;
       if (!isProd) {

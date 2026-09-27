@@ -369,7 +369,7 @@ export default function LiveBlogStudio() {
   const fetchLiveBlogs = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/live-blogs');
+      const res = await api.get('/live-blogs?status=all');
       setBlogs(res.data || []);
     } catch (err) {
       console.error('Error fetching live blogs:', err);

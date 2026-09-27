@@ -119,9 +119,17 @@ export const globalSearch = async (req, res) => {
       photoGalleries: galleryTotal
     };
 
+    let recommendations = [];
+    if (newsTotal < 6) {
+      recommendations = await News.find({ status: 'approved' })
+        .sort({ views: -1, publishedAt: -1, createdAt: -1 })
+        .limit(6)
+        .select('title slug subtitle summary category imageUrl mainImageUrl publishedAt views');
+    }
+
     return res.json({
       query,
-      results: { news, liveBlogs, videos, photoGalleries },
+      results: { news, liveBlogs, videos, photoGalleries, recommendations },
       totals,
       totalMatches: Object.values(totals).reduce((sum, count) => sum + count, 0),
       discovery,
@@ -138,5 +146,35 @@ export const globalSearch = async (req, res) => {
   } catch (error) {
     console.error('Error during global search:', error);
     return res.status(500).json({ error: 'Internal server error during search' });
+  }
+};
+
+// Get search recommendations (top trending, cross-category highlights, and contextual suggestions)
+export const getSearchRecommendations = async (req, res) => {
+  try {
+    const { category, limit = 8 } = req.query;
+    const filter = { status: 'approved' };
+    if (category && category !== 'All') {
+      filter.category = category.toLowerCase();
+    }
+
+    const recommendations = await News.find(filter)
+      .sort({ views: -1, publishedAt: -1, createdAt: -1 })
+      .limit(Math.min(parseInt(limit) || 8, 20))
+      .select('title slug subtitle summary category imageUrl mainImageUrl publishedAt views readingTime');
+
+    const topics = [
+      'Artificial Intelligence', 'Cricket Live Score', 'Global Geopolitics', 
+      'World Economy', 'Stock Markets', 'Cinema & Awards',
+      'Renewable Energy', 'Space Science'
+    ];
+
+    res.json({
+      recommendations,
+      trendingTopics: topics
+    });
+  } catch (error) {
+    console.error('Error fetching search recommendations:', error);
+    res.status(500).json({ error: 'Internal server error fetching recommendations' });
   }
 };

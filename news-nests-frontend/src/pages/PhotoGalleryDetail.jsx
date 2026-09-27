@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bookmark, Image as ImageIcon, Heart, Send } from 'lucide-react';
+import { ArrowLeft, Bookmark, Image as ImageIcon, Heart, Send, ExternalLink } from 'lucide-react';
 import api from '../services/api';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
@@ -313,10 +313,14 @@ const PhotoGalleryDetail = () => {
           </button>
         </div>
 
-        {/* Description */}
-        <p className="text-gray-600 leading-relaxed mb-8">
-          {gallery.description}
-        </p>
+        {/* Editorial Description */}
+        <div className="prose prose-base sm:prose-lg max-w-none mb-8 border-l-4 border-red-600 pl-4 py-2 space-y-4 text-gray-700 leading-relaxed">
+          {gallery.description.split('\n\n').map((paragraph, pIdx) => (
+            <p key={pIdx} className="leading-relaxed">
+              {paragraph.trim()}
+            </p>
+          ))}
+        </div>
 
         {/* Dynamically Adjusting Photo Grid */}
         <div className={`grid gap-4 md:gap-6 mb-12 ${gallery.photos?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
@@ -349,17 +353,26 @@ const PhotoGalleryDetail = () => {
           })}
         </div>
 
-        {/* Related News */}
+        {/* Related News Coverage */}
         {gallery.relatedNews && gallery.relatedNews.length > 0 && (
-          <div className="mt-8 mb-12">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Related News</h2>
-            <ul className="space-y-4">
+          <div className="mt-8 mb-12 p-6 rounded-2xl bg-gray-50 border border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <span className="w-2 h-5 bg-red-600 rounded-sm inline-block"></span>
+              Related Coverage & Reports
+            </h2>
+            <ul className="space-y-3">
               {gallery.relatedNews.map((news, index) => (
-                <li key={index} className="flex gap-2 text-gray-700">
+                <li key={index} className="flex items-start gap-2.5">
                   <span className="text-[#a51a1a] font-bold text-lg leading-none mt-1">•</span>
-                  <a href={news.url} className="hover:text-[#a51a1a] hover:underline">
-                    {news.title}
-                  </a>
+                  {news.url.startsWith('/') ? (
+                    <Link to={news.url} className="text-gray-800 hover:text-red-700 font-semibold transition-colors flex items-center gap-1.5 leading-snug">
+                      {news.title}
+                    </Link>
+                  ) : (
+                    <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:text-red-700 font-semibold transition-colors flex items-center gap-1.5 leading-snug">
+                      {news.title} <ExternalLink className="w-3.5 h-3.5 opacity-60 inline" />
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

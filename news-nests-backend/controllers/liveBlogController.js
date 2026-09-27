@@ -14,15 +14,44 @@ const canManageLiveBlog = async (userId) => {
   return false;
 };
 
-// Get all live blogs (optionally filter by isLive)
+import { isMatchOrStreamEnded } from '../services/liveBlogAutomationService.js';
+
+// Get all live blogs (by default only active live blogs, or filtered by status)
 export const getAllLiveBlogs = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, category } = req.query;
     let query = {};
-    if (status === 'live') query.isLive = true;
-    else if (status === 'ended') query.isLive = false;
+
+    if (status === 'ended') {
+      query.isLive = false;
+    } else if (status === 'all') {
+      // Return both active and ended for studio/admin management
+    } else {
+      // Default: ONLY active live blogs and active streams
+      query.isLive = true;
+    }
+
+    if (category && category.toLowerCase() !== 'all') {
+      query.category = category.toLowerCase();
+    }
 
     const liveBlogs = await LiveBlog.find(query).sort({ updatedAt: -1, createdAt: -1 });
+
+    // Defensive check: If serving live blogs (not status=all/ended), filter out any blog that has concluded
+    // and asynchronously update isLive: false in database so it no longer appears in live stream
+    if (status !== 'all' && status !== 'ended') {
+      const activeOnly = [];
+      for (const blog of liveBlogs) {
+        if (isMatchOrStreamEnded(blog)) {
+          // Concluded match or ended stream -> mark false in DB
+          LiveBlog.updateOne({ _id: blog._id }, { $set: { isLive: false } }).catch(() => {});
+        } else {
+          activeOnly.push(blog);
+        }
+      }
+      return res.json(activeOnly);
+    }
+
     res.json(liveBlogs);
   } catch (error) {
     console.error('Error fetching live blogs:', error);

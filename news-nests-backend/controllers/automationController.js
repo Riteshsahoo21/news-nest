@@ -324,10 +324,14 @@ export const syncLiveScore = async (req, res) => {
 
     if (updateId) liveBlog.lastExternalUpdateId = updateId;
 
-    const isComplete = toBoolean(score.isComplete || score.matchComplete);
+    const statusStr = String(score.result || score.status || score.matchStatus?.matchInfo || '').toLowerCase();
+    const hasCompleteWord = ['won by', 'won the', 'match complete', 'complete', 'match over', 'abandoned', 'match drawn', 'match tied', 'no result'].some(w => statusStr.includes(w));
+    const isComplete = toBoolean(score.isComplete || score.matchComplete) || hasCompleteWord;
+    
     if (isComplete) {
+      liveBlog.isLive = false;
       const finalText = cleanString(score.result || score.status || 'Match complete.', 1000);
-      if (finalText && !liveBlog.updates.some((update) => update.title === 'MATCH OVER' && update.content === finalText)) {
+      if (finalText && !liveBlog.updates.some((update) => update.title === 'MATCH OVER' || update.content === finalText)) {
         liveBlog.updates.unshift({ title: 'MATCH OVER', content: finalText, createdAt: new Date() });
       }
     }

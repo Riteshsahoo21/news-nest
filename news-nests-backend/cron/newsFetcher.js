@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { syncHarmonizedNews } from '../services/unifiedNewsAggregator.js';
 import { fetchAndSaveYouTubeNews, fetchAndSaveCategoryVideos, balanceAllCategoryCounts } from '../services/youtubeService.js';
 import News from '../models/News.js';
+import VideoNews from '../models/VideoNews.js';
+import { startLiveBlogContinuousWorker } from '../services/liveBlogAutomationService.js';
 
 // Schedule Unified Hybrid News Sync to run every hour
 export const initCronJobs = () => {
@@ -54,11 +56,20 @@ export const initCronJobs = () => {
     }
   });
 
+  // Start autonomous continuous outside-world live blog discovery & score sync worker
+  startLiveBlogContinuousWorker();
+
   // Run initial news sync on startup
   setTimeout(async () => {
     try {
       console.log('Running startup news sync (GNews / Scraper)...');
       await syncHarmonizedNews(8);
+
+      const videoCount = await VideoNews.countDocuments({ status: 'approved' });
+      if (videoCount < 10) {
+        console.log(`Video count low (${videoCount}). Triggering initial YouTube fetch...`);
+        await fetchAndSaveYouTubeNews();
+      }
     } catch (e) {
       console.warn('Startup news sync failed:', e.message);
     }
