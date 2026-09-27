@@ -44,3 +44,6 @@ Thumbs.db
 **/ssr-*.txt
 **/ssr-*.html
 n8n/gemini-key.txt
+
+**/.git.standalone_backup/
+**/.git.standalone_backup/**
