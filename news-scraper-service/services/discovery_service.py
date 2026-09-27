@@ -5,6 +5,7 @@ import ipaddress
 import json
 import re
 import time
+import unicodedata
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlparse
@@ -95,12 +96,22 @@ _last_gdelt_request = 0.0
 _gdelt_blocked_until = 0.0
 
 
+_ALLOWED_QUERY_PUNCT = set(" .-'’_")
+
+
 def _clean_query_part(value: Optional[str], max_length: int = 160) -> str:
     if not value:
         return ""
     value = html.unescape(str(value))
-    value = re.sub(r"[^\w\s.\-'’]", " ", value, flags=re.UNICODE)
-    return re.sub(r"\s+", " ", value).strip()[:max_length]
+    allowed_chars = []
+    for ch in value:
+        cat = unicodedata.category(ch)
+        if cat.startswith(("L", "M", "N")) or ch in _ALLOWED_QUERY_PUNCT:
+            allowed_chars.append(ch)
+        else:
+            allowed_chars.append(" ")
+    cleaned = "".join(allowed_chars)
+    return re.sub(r"\s+", " ", cleaned).strip()[:max_length]
 
 
 def _quoted(value: str) -> str:
@@ -553,6 +564,8 @@ async def fetch_google_news_metadata(
             COUNTRY_SETTINGS["in"],
             COUNTRY_SETTINGS["us"]
         ]
+        if any(ord(c) > 127 for c in provider_query):
+            regions_to_fetch.append({"name": "India Hindi", "hl": "hi", "gl": "IN", "ceid": "IN:hi", "mkt": "en-IN"})
 
     entries = []
     seen_links = set()
