@@ -13,6 +13,8 @@ services:
     restart: unless-stopped
     depends_on:
       - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5678:5678"
     environment:
