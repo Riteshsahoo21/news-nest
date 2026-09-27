@@ -35,7 +35,7 @@ export const isMatchOrStreamEnded = (blog) => {
   // Check if latest bulletin is a MATCH OVER bulletin
   if (Array.isArray(blog.updates) && blog.updates.length > 0) {
     const firstUpdateTitle = String(blog.updates[0].title || '').toUpperCase();
-    if (firstUpdateTitle.includes('MATCH OVER') || firstUpdateTitle.includes('FINAL RESULT')) {
+    if (firstUpdateTitle.includes('MATCH OVER') || firstUpdateTitle.includes('FINAL RESULT') || firstUpdateTitle.includes('CONCLUDED')) {
       return true;
     }
   }
@@ -45,30 +45,20 @@ export const isMatchOrStreamEnded = (blog) => {
     return true;
   }
 
+  // Inactivity timeout: If an active blog has received no updates in over 2 hours
+  const lastUpdate = blog.updates && blog.updates.length > 0
+    ? new Date(blog.updates[0].createdAt || blog.updatedAt || blog.createdAt).getTime()
+    : new Date(blog.updatedAt || blog.createdAt).getTime();
+
+  if (Date.now() - lastUpdate > 2 * 60 * 60 * 1000) {
+    return true;
+  }
+
   return false;
 };
 
-const getThematicLiveImage = (category = 'sports', title = '') => {
-  const cat = String(category || '').toLowerCase();
-  const t = String(title || '').toLowerCase();
-
-  if (cat.includes('esport') || t.includes('cs2') || t.includes('valorant') || t.includes('dota') || t.includes('gaming')) {
-    return 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (t.includes('cricket') || t.includes('odi') || t.includes('t20') || t.includes('test') || cat.includes('cricket')) {
-    return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('politic') || t.includes('election') || t.includes('parliament') || t.includes('summit')) {
-    return 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('tech') || t.includes('ai') || t.includes('meta') || t.includes('apple')) {
-    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
-  }
-  return 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80';
-};
-
 /**
- * Audit active live blogs: close any that have finished in real life
+ * Audit active live blogs: close any that have finished in real life or stalled
  */
 export const auditAndCloseEndedLiveBlogs = async () => {
   try {
@@ -112,10 +102,12 @@ export const syncLiveCoverageFromOutsideWorld = async () => {
       const externalMatchId = match.externalMatchId;
       if (!externalMatchId) continue;
 
-      const isLiveMatch = match.isLive === true || 
+      const statusLower = String(match.status || '').toLowerCase();
+      const isPreview = statusLower.includes('preview') || statusLower.includes('upcoming');
+      const isLiveMatch = !isPreview && (match.isLive === true || 
         ['live', 'opt to bat', 'opt to bowl', 'toss', 'innings break', 'lunch', 'tea'].some(m => 
-          String(match.status || '').toLowerCase().includes(m)
-        );
+          statusLower.includes(m)
+        ));
 
       // If the match is live, ensure it exists in MongoDB
       if (isLiveMatch) {
@@ -131,7 +123,7 @@ export const syncLiveCoverageFromOutsideWorld = async () => {
             category: 'cricket',
             isLive: true,
             author: 'News Nests Real-Time Sports Desk',
-            mainImageUrl: getThematicLiveImage('cricket', title),
+            mainImageUrl: (match.imageUrl && !match.imageUrl.includes('unsplash.com')) ? match.imageUrl : '',
             externalMatchId,
             tags: ['Live Coverage', 'Cricket', team1, team2, match.matchType].filter(Boolean),
             matchStatus: {

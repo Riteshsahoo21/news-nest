@@ -63,6 +63,7 @@ export default function RecommendedCarousel({ articles }) {
       <div className="sm:hidden flex flex-col gap-2.5 w-full max-w-full min-w-0 pt-1">
         {articles.slice(0, 6).map((article, index) => {
           const imgUrl = article.imageUrl || article.coverImage || article.thumbnail;
+          const hasImg = Boolean(imgUrl && !imgUrl.includes('unsplash.com'));
           const readTime = article.readTime || Math.max(2, Math.ceil((article.content?.length || 800) / 600));
 
           return (
@@ -82,16 +83,18 @@ export default function RecommendedCarousel({ articles }) {
                   {readTime} min read
                 </div>
               </div>
-              <div className="w-20 h-20 rounded-lg bg-muted overflow-hidden shrink-0 relative">
-                <SafeImage 
-                  src={imgUrl} 
-                  alt={article.title} 
-                  category={article.category}
-                  subCategory={article.subCategory}
-                  country={article.country}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              {hasImg && (
+                <div className="w-20 h-20 rounded-lg bg-muted overflow-hidden shrink-0 relative">
+                  <SafeImage 
+                    src={imgUrl} 
+                    alt={article.title} 
+                    category={article.category}
+                    subCategory={article.subCategory}
+                    country={article.country}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
             </Link>
           );
         })}
@@ -102,6 +105,7 @@ export default function RecommendedCarousel({ articles }) {
         <div className="flex touch-pan-y gap-5 w-full pb-2 pt-1">
           {articles.map((article, index) => {
             const imgUrl = article.imageUrl || article.coverImage || article.thumbnail;
+            const hasImg = Boolean(imgUrl && !imgUrl.includes('unsplash.com'));
             const readTime = article.readTime || Math.max(2, Math.ceil((article.content?.length || 800) / 600));
 
             return (
@@ -113,19 +117,27 @@ export default function RecommendedCarousel({ articles }) {
                   to={`?articleId=${article.slug || article._id}`} 
                   className="flex flex-col h-full rounded-xl overflow-hidden group shadow-xs hover:shadow-md bg-card border border-border/80 hover:border-red-600/40 transition-all duration-300 transform hover:-translate-y-0.5 min-w-0"
                 >
-                  <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden shrink-0">
-                    <SafeImage 
-                      src={imgUrl} 
-                      alt={article.title} 
-                      category={article.category}
-                      subCategory={article.subCategory}
-                      country={article.country}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[9px] font-extrabold font-mono uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">
-                      {article.category || 'GLOBAL'}
+                  {hasImg ? (
+                    <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden shrink-0">
+                      <SafeImage 
+                        src={imgUrl} 
+                        alt={article.title} 
+                        category={article.category}
+                        subCategory={article.subCategory}
+                        country={article.country}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[9px] font-extrabold font-mono uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">
+                        {article.category || 'GLOBAL'}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="pt-3.5 px-3.5 flex items-center">
+                      <span className="bg-red-600 text-white text-[9px] font-extrabold font-mono uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">
+                        {article.category || 'GLOBAL'}
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="p-3.5 flex-1 flex flex-col justify-between w-full min-w-0 bg-card">
                     <div>

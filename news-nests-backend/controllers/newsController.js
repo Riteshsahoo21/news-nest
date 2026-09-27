@@ -90,16 +90,42 @@ export const getAllNews = async (req, res) => {
       filter.language = language.toLowerCase();
     }
 
+    const isHomeView = req.query.forHome === 'true' || (!country && !subCategory && !req.query.category && !req.query.allStatus && !q);
+
     // Search query
     if (q) {
       const searchFilter = buildSearchFilter(q, NEWS_SEARCH_FIELDS);
       if (searchFilter) Object.assign(filter, searchFilter);
-    } else if (!country && !subCategory && !req.query.category && !req.query.allStatus) {
-      // Default home view: show verified authentic global/national news + reporter articles
-      filter.$or = [
-        { isFeaturedOnHome: true },
-        { authorId: { $ne: null } }
+    } else if (isHomeView) {
+      // Default home view: show verified authentic news with real image and substantive description
+      filter.imageUrl = { 
+        $exists: true, 
+        $ne: '', 
+        $nin: [null, ''], 
+        $not: /unsplash\.com/i 
+      };
+
+      const homeConditions = [
+        {
+          $or: [
+            { content: { $exists: true, $ne: '', $not: /We use cookies and data/i } },
+            { summary: { $exists: true, $ne: '', $not: /We use cookies and data/i } }
+          ]
+        },
+        {
+          $or: [
+            { isFeaturedOnHome: true },
+            { authorId: { $ne: null } },
+            { isFullContentFetched: true }
+          ]
+        }
       ];
+
+      if (filter.$and) {
+        filter.$and.push(...homeConditions);
+      } else {
+        filter.$and = homeConditions;
+      }
     }
     
     let query = News.find(filter).sort(sortObj);
@@ -109,6 +135,19 @@ export const getAllNews = async (req, res) => {
       query = query.limit(Math.max(targetLimit * 2, 100));
     }
     let news = await query;
+
+    if (isHomeView) {
+      news = news.filter((art) => {
+        const img = art.imageUrl || art.coverImage || '';
+        if (!img || img.includes('unsplash.com')) return false;
+        const text = (art.content || art.summary || art.subtitle || '').trim();
+        if (text.length < 80) return false;
+        if (/we use cookies and data/i.test(text) || /privacytools/i.test(text) || /choose to [‘']?accept all/i.test(text)) {
+          return false;
+        }
+        return true;
+      });
+    }
     
     // Apply reporter priority shuffling for readers on newest/default sorts
     if (!req.query.allStatus && (!sort || sort === 'newest') && !q) {
@@ -229,6 +268,23 @@ export const getLocalNews = async (req, res) => {
       nearbyArticles = [...nearbyArticles, ...globalArticles];
     }
 
+    if (req.query.forHome === 'true') {
+      const isComplete = (art) => {
+        const img = art.imageUrl || art.coverImage || '';
+        if (!img || img.includes('unsplash.com')) return false;
+        const text = (art.content || art.summary || art.subtitle || '').trim();
+        if (text.length < 80) return false;
+        if (/we use cookies and data/i.test(text) || /privacytools/i.test(text) || /choose to [‘']?accept all/i.test(text)) {
+          return false;
+        }
+        return true;
+      };
+      exactArticles = exactArticles.filter(isComplete);
+      nearbyArticles = nearbyArticles.filter(isComplete);
+      countryArticles = countryArticles.filter(isComplete);
+      globalArticles = globalArticles.filter(isComplete);
+    }
+
     res.json({
       location,
       articles: nearbyArticles,
@@ -326,7 +382,12 @@ export const getNewsById = async (req, res) => {
 export const getEditorPicks = async (req, res) => {
   try {
     const sortObj = getSortObject(req.query.sort);
-    const news = await News.find({ isEditorPick: true, status: 'approved' }).sort(sortObj);
+    const news = await News.find({ 
+      isEditorPick: true, 
+      status: 'approved',
+      imageUrl: { $exists: true, $ne: '', $nin: [null, ''], $not: /unsplash\.com/i },
+      content: { $exists: true, $ne: '', $not: /We use cookies and data/i }
+    }).sort(sortObj);
     res.json(news);
   } catch (error) {
     console.error('Error fetching editor picks:', error);
@@ -338,7 +399,12 @@ export const getEditorPicks = async (req, res) => {
 export const getTrendingNews = async (req, res) => {
   try {
     const sortObj = getSortObject(req.query.sort);
-    const news = await News.find({ isTrending: true, status: 'approved' }).sort(sortObj);
+    const news = await News.find({ 
+      isTrending: true, 
+      status: 'approved',
+      imageUrl: { $exists: true, $ne: '', $nin: [null, ''], $not: /unsplash\.com/i },
+      content: { $exists: true, $ne: '', $not: /We use cookies and data/i }
+    }).sort(sortObj);
     res.json(news);
   } catch (error) {
     console.error('Error fetching trending news:', error);

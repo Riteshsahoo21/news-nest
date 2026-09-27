@@ -39,7 +39,8 @@ export default function RelatedNewsSection({
         <div className="space-y-3">
           {validArticles.map((item, idx) => {
             const articleUrl = `/article/${item.slug || item._id}`;
-            const img = item.imageUrl || item.mainImageUrl || item.image;
+            const rawImg = item.imageUrl || item.mainImageUrl || item.image;
+            const img = (rawImg && !rawImg.includes('unsplash.com')) ? rawImg : null;
             return (
               <Link
                 key={item._id || idx}
@@ -99,7 +100,8 @@ export default function RelatedNewsSection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {validArticles.map((item, idx) => {
             const articleUrl = `/article/${item.slug || item._id}`;
-            const img = item.imageUrl || item.mainImageUrl || item.image;
+            const rawImg = item.imageUrl || item.mainImageUrl || item.image;
+            const img = (rawImg && !rawImg.includes('unsplash.com')) ? rawImg : null;
             const handleClick = (e) => {
               if (onSelectArticle) {
                 e.preventDefault();
@@ -175,7 +177,8 @@ export default function RelatedNewsSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {validArticles.map((item, idx) => {
           const articleUrl = `/article/${item.slug || item._id}`;
-          const img = item.imageUrl || item.mainImageUrl || item.image;
+          const rawImg = item.imageUrl || item.mainImageUrl || item.image;
+          const img = (rawImg && !rawImg.includes('unsplash.com')) ? rawImg : null;
           const snippet = item.subtitle || item.summary;
 
           return (

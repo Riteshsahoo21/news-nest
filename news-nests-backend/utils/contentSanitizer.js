@@ -21,8 +21,15 @@ const NOISE_LINE_PATTERNS = [
   /^trending now/i,
   /^sponsored content/i,
   /^share this (story|article)/i,
-  /^leave a comment/i,
-  /^download the app/i
+  /^download the app/i,
+  /we use cookies and data/i,
+  /if you choose to [‘']?accept all/i,
+  /reject all[’']?,? we will not use cookies/i,
+  /non-personalized content is influenced by/i,
+  /visit g\.co\/privacytools/i,
+  /managing your privacy settings/i,
+  /cookie (policy|notice|preferences|settings)/i,
+  /consent (preferences|manager)/i
 ];
 
 /**
@@ -106,6 +113,9 @@ export const cleanArticleText = (text) => {
   }
 
   // 7. Join with double newlines
-  const result = cohesiveParagraphs.join('\n\n');
-  return result.replace(/\n{3,}/g, '\n\n').trim();
+  const result = cohesiveParagraphs.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (result.length < 50 || /we use cookies and data/i.test(result) || /privacytools/i.test(result)) {
+    return '';
+  }
+  return result;
 };

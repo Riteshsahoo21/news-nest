@@ -37,6 +37,25 @@ export const getCategoryFallback = (category = '', subCategory = '', country = '
  * 3. Guaranteed graceful fallback to high-resolution category-tailored editorial photography.
  * 4. Smooth opacity transition on load to prevent layout flicker.
  */
+export const isUnsplashUrl = (url) => typeof url === 'string' && url.includes('unsplash.com');
+
+export const getValidArticleImage = (article) => {
+  if (!article) return '';
+  const candidates = [
+    article.imageUrl,
+    article.coverImage,
+    article.mainImageUrl,
+    article.thumbnail,
+    ...(Array.isArray(article.mediaUrls) ? article.mediaUrls : [])
+  ];
+  for (const url of candidates) {
+    if (typeof url === 'string' && url.trim() && url !== 'null' && url !== 'undefined' && !isUnsplashUrl(url)) {
+      return url.trim();
+    }
+  }
+  return '';
+};
+
 export default function SafeImage({
   src,
   alt = 'News Story Image',
@@ -46,9 +65,9 @@ export default function SafeImage({
   country = '',
   loading = 'lazy',
   style = {},
-  allowFallback = true
+  allowFallback = false
 }) {
-  const isUnsplash = (url) => typeof url === 'string' && url.includes('unsplash.com');
+  const isUnsplash = (url) => isUnsplashUrl(url);
   const fallbackUrl = allowFallback ? getCategoryFallback(category, subCategory, country) : '';
   const initialUrl = (src && src.trim() && src !== 'null' && src !== 'undefined' && (!isUnsplash(src) || allowFallback)) 
     ? src.trim() 

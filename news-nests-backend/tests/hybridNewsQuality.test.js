@@ -38,3 +38,20 @@ test('headline-only records are rejected before storage', () => {
     keyTakeaways: []
   }), false);
 });
+
+test('articles without images from source pass completeness gate cleanly', () => {
+  assert.equal(isCompleteScrapedArticle({
+    content: longBody,
+    isFullContentFetched: true,
+    sourceUrl: 'https://publisher.example/wire-report',
+    sourceName: 'Wire News',
+    author: 'Field Reporter',
+    imageUrl: '',
+    mainImageUrl: '',
+    mediaUrls: [],
+    publishedAt: '2026-09-28T01:00:00.000Z',
+    aiSummary: 'A sufficiently descriptive summary of the text report without images.',
+    keyTakeaways: ['Primary analytical takeaway from the wire text.']
+  }), true);
+});
+

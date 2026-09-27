@@ -41,15 +41,47 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen || !blogId) return;
 
-    fetchBlogData(true);
+    let isMounted = true;
+    let pollTimer = null;
 
-    // 2-SECOND REAL-TIME POLLING INTERVAL
-    const interval = setInterval(() => {
-      fetchBlogData(false);
-    }, 2000);
+    const fetchLiveCoverage = async (isInitial = false) => {
+      try {
+        if (isInitial) setLoading(true);
+        const res = await api.get(`/live-blogs/${blogId}`);
+        if (!isMounted) return;
+        const data = res.data;
+        setBlog(data);
 
-    return () => clearInterval(interval);
-  }, [isOpen, blogId]);
+        if (user && data.savedBy) {
+          setIsSaved(data.savedBy.some(id => id === user._id || id?.toString() === user._id?.toString()));
+        }
+
+        if (user && data.poll && data.poll.votedUsers) {
+          const myVote = data.poll.votedUsers.find(v => v.user === user._id || v.user?.toString() === user._id?.toString());
+          if (myVote !== undefined && myVote.optionIndex !== undefined) {
+            setHasVoted(true);
+            setSelectedOpt(myVote.optionIndex);
+          }
+        }
+
+        // Only continue real-time polling if event is actively live
+        if (data.isLive && isMounted) {
+          pollTimer = setTimeout(() => fetchLiveCoverage(false), 2000);
+        }
+      } catch (err) {
+        console.error('Error fetching live blog details:', err);
+      } finally {
+        if (isInitial && isMounted) setLoading(false);
+      }
+    };
+
+    fetchLiveCoverage(true);
+
+    return () => {
+      isMounted = false;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [isOpen, blogId, user]);
 
   const fetchBlogData = async (isInitial = false) => {
     try {
@@ -186,7 +218,7 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
       "coverageStartTime": blog.createdAt || new Date().toISOString(),
       "coverageEndTime": blog.isLive ? undefined : (blog.updatedAt || new Date().toISOString()),
       "url": window.location.href,
-      "image": [blog.mainImageUrl || "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200"],
+      "image": (blog.mainImageUrl && !blog.mainImageUrl.includes('unsplash.com')) ? [blog.mainImageUrl] : undefined,
       "liveBlogUpdate": (blog.updates || []).slice(0, 10).map(u => ({
         "@type": "BlogPosting",
         "headline": u.title || "Live News Update",
@@ -211,7 +243,7 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
         <SeoHead
           title={`${blog.title || 'LIVE Coverage'} - News Nests`}
           description={blog.description || "Watch active WebRTC journalism broadcast feeds and interactive breaking updates."}
-          image={blog.mainImageUrl}
+          image={(blog.mainImageUrl && !blog.mainImageUrl.includes('unsplash.com')) ? blog.mainImageUrl : undefined}
           type="website"
           schema={liveBlogSchema}
         />
@@ -260,10 +292,14 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            {blog?.isLive && (
+            {blog?.isLive ? (
               <span className="hidden lg:flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-[11px] font-mono font-extrabold px-3 py-1 rounded-full shadow-2xs">
                 <Activity className="w-3 h-3 animate-pulse text-emerald-600 dark:text-emerald-400" />
-                <span>SYNCING EVERY 5S</span>
+                <span>SYNCING EVERY 2S</span>
+              </span>
+            ) : (
+              <span className="hidden lg:flex items-center gap-2 bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 border border-slate-300 dark:border-gray-700 text-[11px] font-mono font-extrabold px-3 py-1 rounded-full">
+                <span>COVERAGE ARCHIVED</span>
               </span>
             )}
             
@@ -299,22 +335,6 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
           </div>
         ) : !blog ? (
           <div className="py-20 text-center text-red-600 dark:text-red-400 font-bold font-serif text-lg bg-[#f8f9fa] dark:bg-[#0b0e14] flex-1">Failed to access live editorial coverage.</div>
-        ) : (!canManage && blog.isLive === false) ? (
-          <div className="py-32 text-center flex flex-col items-center justify-center bg-[#f8f9fa] dark:bg-[#0b0e14] flex-1 px-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-900/10 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-slate-600 dark:text-gray-400 mb-4 shadow-md">
-              <Radio className="w-8 h-8 opacity-50" />
-            </div>
-            <h3 className="text-xl font-bold font-serif text-slate-900 dark:text-white mb-2">Live Coverage Has Concluded</h3>
-            <p className="text-sm text-slate-600 dark:text-gray-400 max-w-md mx-auto leading-relaxed mb-6">
-              This broadcast event has ended and is no longer actively streaming or accessible to the general public. Please return to explore active real-time broadcasts!
-            </p>
-            <button
-              onClick={onClose}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg hover:shadow-red-600/25 transition-all tracking-wider uppercase font-mono"
-            >
-              Explore Active Live Streams
-            </button>
-          </div>
         ) : (
           <div className="overflow-y-auto flex-1 bg-[#f8f9fa] dark:bg-[#0b0e14] p-4 sm:p-8 transition-colors">
             <div className="max-w-6xl mx-auto space-y-8">
@@ -390,7 +410,7 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
                     {blog.description}
                   </p>
 
-                  {blog.mainImageUrl && (
+                  {blog.mainImageUrl && !blog.mainImageUrl.includes('unsplash.com') && (
                     <div 
                       onClick={() => setActiveMediaPreview(blog.mainImageUrl)}
                       className="rounded-2xl overflow-hidden shadow-md max-h-[360px] border border-gray-200 dark:border-gray-800 group relative cursor-pointer"
@@ -470,7 +490,7 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
                                 {upd.content}
                               </p>
 
-                              {upd.imageUrl && (
+                              {upd.imageUrl && !upd.imageUrl.includes('unsplash.com') && (
                                 <div 
                                   onClick={() => setActiveMediaPreview(upd.imageUrl)}
                                   className="mt-4 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-md max-h-80 cursor-pointer group/img relative"

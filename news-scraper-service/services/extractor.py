@@ -44,7 +44,15 @@ NOISE_PATTERNS = [
     r'sponsored content',
     r'share this (story|article)',
     r'leave a comment',
-    r'download the app'
+    r'download the app',
+    r'we use cookies and data',
+    r'if you choose to [‘\']?accept all',
+    r'reject all[’\']?,? we will not use cookies',
+    r'non-personalized content is influenced by',
+    r'visit g\.co/privacytools',
+    r'managing your privacy settings',
+    r'cookie (policy|notice|preferences|settings)',
+    r'consent (preferences|manager)'
 ]
 
 NOISE_SELECTORS = [
@@ -119,7 +127,10 @@ def clean_extracted_text(text: str) -> str:
         final_paras.append(current_para)
 
     joined = "\n\n".join(final_paras)
-    return re.sub(r"\n{3,}", "\n\n", joined).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", joined).strip()
+    if len(cleaned) < 50 or re.search(r'we use cookies and data|g\.co/privacytools', cleaned, re.IGNORECASE):
+        return ""
+    return cleaned
 
 import urllib.request
 import asyncio
@@ -444,16 +455,16 @@ async def extract_full_article(
 
     final_content = candidate_content if len(candidate_content) >= 50 else (fallback_content or fallback_title or "Full report details.")
 
-    # Guaranteed non-empty image: Page meta -> Fallback image -> In-article media -> Category fallback
+    # Page meta -> Fallback image -> In-article media (NO synthetic stock photo fallbacks)
     final_image = meta_info.get("image", "")
     if not final_image and fallback_image:
         final_image = clean_and_resolve_image_url(fallback_image, url)
     if not final_image and meta_info.get("media_urls"):
         final_image = meta_info["media_urls"][0]
-    if not final_image:
-        final_image = get_category_fallback_image(category or "", sub_category or "", country or "")
+    if final_image and "unsplash.com" in final_image:
+        final_image = ""
 
-    media_urls = meta_info.get("media_urls", [])
+    media_urls = [u for u in meta_info.get("media_urls", []) if u and "unsplash.com" not in u]
     if final_image and final_image not in media_urls:
         media_urls.insert(0, final_image)
 

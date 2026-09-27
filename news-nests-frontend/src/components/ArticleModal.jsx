@@ -484,6 +484,7 @@ export default function ArticleModal({ articleId, onClose }) {
                   </div>
                 )}
 
+
                 {/* Video Coverage / Main Image */}
                 {article.videoUrl ? (
                   <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-border/50 aspect-video relative">
@@ -507,32 +508,35 @@ export default function ArticleModal({ articleId, onClose }) {
                       </video>
                     )}
                   </div>
-                ) : article.mediaUrls && article.mediaUrls.length > 1 ? (
+                ) : (Array.isArray(article.mediaUrls) ? article.mediaUrls.filter(u => u && !u.includes('unsplash.com')) : []).length > 1 ? (
                   <div className="mb-6 grid gap-4">
-                    <figure className="rounded-xl overflow-hidden shadow-sm border border-border/50">
-                      <SafeImage 
-                        src={article.mediaUrls[0].startsWith('http') ? article.mediaUrls[0] : `http://localhost:5000/${article.mediaUrls[0].replace('\\', '/')}`} 
-                        alt={article.title} 
-                        category={article.category}
-                        subCategory={article.subCategory}
-                        country={article.country}
-                        className="w-full max-h-[400px] object-cover" 
-                      />
-                    </figure>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {article.mediaUrls.slice(1).map((url, idx) => (
-                        <figure key={idx} className="rounded-xl overflow-hidden shadow-sm border border-border/50 aspect-[4/3]">
-                          <SafeImage 
-                            src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
-                            alt={`${article.title} ${idx + 2}`} 
-                            category={article.category}
-                            subCategory={article.subCategory}
-                            country={article.country}
-                            className="w-full h-full object-cover" 
-                          />
-                        </figure>
-                      ))}
-                    </div>
+                    {(() => {
+                      const validMediaUrls = article.mediaUrls.filter(u => u && !u.includes('unsplash.com'));
+                      return (
+                        <>
+                          <figure className="rounded-xl overflow-hidden shadow-sm border border-border/50">
+                            <SafeImage 
+                              src={validMediaUrls[0].startsWith('http') ? validMediaUrls[0] : `http://localhost:5000/${validMediaUrls[0].replace('\\', '/')}`} 
+                              alt={article.title} 
+                              allowFallback={false}
+                              className="w-full max-h-[400px] object-cover" 
+                            />
+                          </figure>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {validMediaUrls.slice(1).map((url, idx) => (
+                              <figure key={idx} className="rounded-xl overflow-hidden shadow-sm border border-border/50 aspect-[4/3]">
+                                <SafeImage 
+                                  src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
+                                  alt={`${article.title} ${idx + 2}`} 
+                                  allowFallback={false}
+                                  className="w-full h-full object-cover" 
+                                />
+                              </figure>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : (article.imageUrl || article.mainImageUrl) && !(article.imageUrl || article.mainImageUrl).includes('unsplash.com') ? (
                   <figure className="mb-6 rounded-xl overflow-hidden shadow-sm border border-border/50">
@@ -561,9 +565,13 @@ export default function ArticleModal({ articleId, onClose }) {
                 {/* Structured Editorial Content */}
                 <div className="py-2">
                   <FormattedArticleContent 
-                    content={article.content} 
+                    content={
+                      (/we use cookies and data/i.test(article.content || '') || /privacytools/i.test(article.content || ''))
+                        ? (article.summary || article.subtitle || 'Live field report and wire dispatch. Access the full story at the publisher link below.')
+                        : article.content
+                    } 
                     author={article.author || 'News Bureau'} 
-                    mediaUrls={article.mediaUrls || []}
+                    mediaUrls={(Array.isArray(article.mediaUrls) ? article.mediaUrls : []).filter(u => u && !u.includes('unsplash.com'))}
                     category={article.category}
                     subCategory={article.subCategory}
                     country={article.country}

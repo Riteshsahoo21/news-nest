@@ -24,6 +24,8 @@ export default function TrendingStories({ articles }) {
           const author = article.author || article.reporter || 'News Bureau';
           const views = article.views > 0 ? (article.views >= 1000 ? `${(article.views / 1000).toFixed(1)}k` : article.views) : `${(index * 3) + 4}.2k`;
 
+          const hasImage = Boolean(imgUrl && !imgUrl.includes('unsplash.com'));
+
           return (
             <Link 
               key={article._id || index} 
@@ -54,17 +56,19 @@ export default function TrendingStories({ articles }) {
                 </p>
               </div>
 
-              {/* Thumbnail Image */}
-              <div className="shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-muted relative border border-border/50 shadow-xs">
-                <SafeImage 
-                  src={imgUrl} 
-                  alt={article.title} 
-                  category={article.category}
-                  subCategory={article.subCategory}
-                  country={article.country}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-              </div>
+              {/* Thumbnail Image (Render only if genuine image exists) */}
+              {hasImage && (
+                <div className="shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-muted relative border border-border/50 shadow-xs">
+                  <SafeImage 
+                    src={imgUrl} 
+                    alt={article.title} 
+                    category={article.category}
+                    subCategory={article.subCategory}
+                    country={article.country}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                </div>
+              )}
             </Link>
           );
         })}

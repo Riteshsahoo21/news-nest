@@ -85,14 +85,15 @@ export default function Home() {
               latitude: coordinates.latitude,
               longitude: coordinates.longitude,
               country: getLocaleCountry(),
-              limit: 50
+              limit: 50,
+              forHome: true
             }
           });
           return res.data;
         } catch {
           const fallbackCountry = getLocaleCountry();
           const fallbackRes = await api.get('/news', {
-            params: { limit: 50, ...(fallbackCountry ? { country: fallbackCountry } : {}) }
+            params: { limit: 50, forHome: true, ...(fallbackCountry ? { country: fallbackCountry } : {}) }
           });
           return {
             articles: fallbackRes.data.data || fallbackRes.data || [],
@@ -101,7 +102,7 @@ export default function Home() {
         }
       }
 
-      let endpoint = '/news?limit=50';
+      let endpoint = '/news?limit=50&forHome=true';
       if (selectedRegion === 'esports') {
         endpoint += '&subCategory=esports';
       } else if (selectedRegion !== 'all') {
@@ -125,16 +126,32 @@ export default function Home() {
   const articles = data?.articles || [];
   const error = isError ? 'Failed to fetch latest news.' : null;
 
-  // Prepare complete editorial pool without dropping articles
-  const allReturnedArticles = Array.isArray(articles) ? articles : [];
+  // Strict quality filter: Home page only displays articles that are fully complete with a real image and substantive text
+  const isCompleteHomeArticle = (article) => {
+    if (!article) return false;
+    const rawImg = article.imageUrl || article.coverImage || article.thumbnail;
+    if (!rawImg || typeof rawImg !== 'string' || !rawImg.trim() || rawImg.includes('unsplash.com')) {
+      return false;
+    }
+    const text = (article.content || article.summary || article.subtitle || '').trim();
+    if (text.length < 80) return false;
+    if (/we use cookies and data/i.test(text) || /privacytools/i.test(text) || /choose to [‘']?accept all/i.test(text)) {
+      return false;
+    }
+    return true;
+  };
+
+  const allReturnedArticles = (Array.isArray(articles) ? articles : []).filter(isCompleteHomeArticle);
   const isNearbyView = selectedRegion === 'nearby';
   const exactCount = Number.isFinite(data?.exactMatches) ? data.exactMatches : 0;
-  const localArticles = Array.isArray(data?.localArticles)
+  const localArticles = (Array.isArray(data?.localArticles)
     ? data.localArticles
-    : allReturnedArticles.slice(0, exactCount);
-  const fallbackArticles = Array.isArray(data?.fallbackArticles)
+    : allReturnedArticles.slice(0, exactCount)
+  ).filter(isCompleteHomeArticle);
+  const fallbackArticles = (Array.isArray(data?.fallbackArticles)
     ? data.fallbackArticles
-    : allReturnedArticles.slice(exactCount);
+    : allReturnedArticles.slice(exactCount)
+  ).filter(isCompleteHomeArticle);
   // Local mode never mixes national/global fallbacks into its Odisha/city
   // carousels or View More grid. Fallback coverage remains separately labeled.
   const safeArticles = isNearbyView ? localArticles : allReturnedArticles;

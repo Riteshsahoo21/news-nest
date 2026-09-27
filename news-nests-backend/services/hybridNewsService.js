@@ -48,20 +48,19 @@ export const selectRichestContent = (...values) => values
 export const isCompleteScrapedArticle = (article) => {
   if (!article) return false;
   const content = cleanArticleText(article.content || '');
-  const mediaUrls = Array.isArray(article.mediaUrls) ? article.mediaUrls.filter(isHttpUrl) : [];
-  const hasImage = isHttpUrl(article.mainImageUrl) || isHttpUrl(article.imageUrl) || mediaUrls.length > 0;
   const takeaways = Array.isArray(article.keyTakeaways)
     ? article.keyTakeaways.filter((item) => typeof item === 'string' && item.trim())
     : [];
 
   return Boolean(
     article.isFullContentFetched &&
+    article.imageUrl &&
+    !article.imageUrl.includes('unsplash.com') &&
     content.length >= MIN_COMPLETE_CONTENT_LENGTH &&
+    !/we use cookies and data/i.test(content) &&
     isHttpUrl(article.sourceUrl) &&
     typeof article.sourceName === 'string' && article.sourceName.trim() &&
     typeof article.author === 'string' && article.author.trim() &&
-    hasImage &&
-    mediaUrls.length > 0 &&
     toValidDate(article.publishedAt) &&
     typeof article.aiSummary === 'string' && article.aiSummary.trim().length >= 40 &&
     takeaways.length > 0
@@ -86,16 +85,14 @@ const extractCompleteArticle = async (article, { timeoutMs = 45000 } = {}) => {
 
     const extracted = response.data || {};
     const content = selectRichestContent(extracted.content, article.content, article.summary);
-    const imageUrl = extracted.imageUrl || article.imageUrl || getCategoryFallbackImage(
-      article.category,
-      article.subCategory,
-      article.country
-    );
+    const isUnsplash = (url) => typeof url === 'string' && url.includes('unsplash.com');
+    const rawImage = extracted.imageUrl || article.imageUrl || '';
+    const imageUrl = isUnsplash(rawImage) ? '' : rawImage;
     const mediaUrls = Array.from(new Set([
       ...(Array.isArray(extracted.mediaUrls) ? extracted.mediaUrls : []),
       ...(Array.isArray(article.mediaUrls) ? article.mediaUrls : []),
-      imageUrl
-    ].filter(isHttpUrl)));
+      ...(imageUrl ? [imageUrl] : [])
+    ].filter(isHttpUrl).filter((u) => !isUnsplash(u))));
     const publishedAt = toValidDate(extracted.publishedAt || article.publishedAt);
     const sourceName = String(article.sourceName || '').trim();
     const extractedAuthor = String(extracted.author || '').trim();
@@ -142,7 +139,13 @@ const extractCompleteArticle = async (article, { timeoutMs = 45000 } = {}) => {
       tags,
       metaDescription: aiSummary.slice(0, 300),
       seoTitle: cleanArticleText(article.title).slice(0, 120),
-      isFeaturedOnHome: article.isFeaturedOnHome ?? true,
+      isFeaturedOnHome: Boolean(
+        article.isFeaturedOnHome !== false &&
+        imageUrl &&
+        !imageUrl.includes('unsplash.com') &&
+        content.length >= MIN_COMPLETE_CONTENT_LENGTH &&
+        !/we use cookies and data/i.test(content)
+      ),
       isFullContentFetched: content.length >= MIN_COMPLETE_CONTENT_LENGTH,
       status: 'approved',
       isTrending: true,
@@ -434,11 +437,13 @@ export const getFullArticleContent = async (articleDoc) => {
       const extractedBody = cleanArticleText(extracted.content);
       const existingBody = cleanArticleText(articleDoc.content || '');
       const cleanedBody = extractedBody.length >= existingBody.length ? extractedBody : existingBody;
-      if (cleanedBody.length >= 100) {
+      if (cleanedBody.length >= 100 && !/we use cookies and data/i.test(cleanedBody) && !/privacytools/i.test(cleanedBody)) {
         const mediaList = Array.from(new Set(
-          (Array.isArray(extracted.mediaUrls) ? extracted.mediaUrls : []).filter(Boolean)
+          (Array.isArray(extracted.mediaUrls) ? extracted.mediaUrls : []).filter(u => u && !u.includes('unsplash.com'))
         ));
-        const resolvedImg = extracted.imageUrl || mediaList[0] || articleDoc.imageUrl || getCategoryFallbackImage(articleDoc.category, articleDoc.subCategory, articleDoc.country);
+        const validDocImg = (articleDoc.imageUrl && !articleDoc.imageUrl.includes('unsplash.com')) ? articleDoc.imageUrl : '';
+        const rawResolvedImg = extracted.imageUrl || mediaList[0] || validDocImg;
+        const resolvedImg = (rawResolvedImg && !rawResolvedImg.includes('unsplash.com')) ? rawResolvedImg : '';
         
         const updates = {
           content: cleanedBody,
@@ -449,7 +454,7 @@ export const getFullArticleContent = async (articleDoc) => {
           isFullContentFetched: Boolean(cleanedBody.length >= 350),
           imageUrl: resolvedImg,
           mainImageUrl: resolvedImg,
-          mediaUrls: mediaList.length > 0 ? mediaList : (articleDoc.mediaUrls?.length > 0 ? articleDoc.mediaUrls : [resolvedImg].filter(Boolean))
+          mediaUrls: mediaList.length > 0 ? mediaList : [resolvedImg].filter(Boolean)
         };
 
         if (!articleDoc.publishedAt) {

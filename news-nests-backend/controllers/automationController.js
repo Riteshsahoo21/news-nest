@@ -123,31 +123,6 @@ export const getAutomationLiveBlogs = async (req, res) => {
   }
 };
 
-const getThematicLiveImage = (category = 'sports', title = '') => {
-  const cat = String(category || '').toLowerCase();
-  const t = String(title || '').toLowerCase();
-
-  if (cat.includes('esport') || t.includes('cs2') || t.includes('valorant') || t.includes('fortnite') || t.includes('dota') || t.includes('gaming')) {
-    return 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (t.includes('cricket') || t.includes('odi') || t.includes('t20') || t.includes('test') || t.includes('wicket') || t.includes('stumps') || cat.includes('cricket')) {
-    return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('sport') || t.includes('league') || t.includes('cup') || t.includes('championship') || t.includes('match')) {
-    return 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('politic') || t.includes('election') || t.includes('parliament') || t.includes('congress') || t.includes('minister') || t.includes('court') || t.includes('government')) {
-    return 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('world') || t.includes('diplomacy') || t.includes('un ') || t.includes('treaty') || t.includes('iran') || t.includes('summit') || t.includes('crisis')) {
-    return 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?auto=format&fit=crop&w=1200&q=80';
-  }
-  if (cat.includes('tech') || t.includes('ai ') || t.includes('meta') || t.includes('google') || t.includes('apple') || t.includes('robot') || t.includes('software')) {
-    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
-  }
-  return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80';
-};
-
 export const upsertLiveFixture = async (req, res) => {
   try {
     const fixture = req.body.fixture || req.body;
@@ -166,7 +141,9 @@ export const upsertLiveFixture = async (req, res) => {
       fixture.description || `Live score, real-time commentary and instant bulletins for ${title}${venue ? ` at ${venue}` : ''}.`,
       1000
     );
-    const mainImageUrl = cleanString(fixture.mainImageUrl || getThematicLiveImage(category, title), 500);
+    const rawImage = fixture.mainImageUrl || fixture.imageUrl || '';
+    const isUnsplash = (url) => typeof url === 'string' && url.includes('unsplash.com');
+    const mainImageUrl = (rawImage && !isUnsplash(rawImage)) ? cleanString(rawImage, 500) : '';
 
     const initialStats = Array.isArray(fixture.customStats) && fixture.customStats.length > 0
       ? fixture.customStats
@@ -355,29 +332,46 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         title: 'Grand Finals Live: Team Vitality vs Aurora Gaming - CS2 StarSeries Fall 2026',
         description: 'Comprehensive round-by-round commentary, tactical utility analytics, and economy telemetry from the CS2 StarSeries Fall 2026 Grand Final showdown.',
         category: 'esports',
-        mainImageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
+        mainImageUrl: '',
+        isLive: false,
         author: 'News Nests Esports Desk',
         matchStatus: {
-          team1: { name: 'Team Vitality', score: '2' },
+          team1: { name: 'Team Vitality', score: '3 (Champions)' },
           team2: { name: 'Aurora Gaming', score: '1' },
-          matchInfo: 'Grand Final (BO5) • Map 4: Inferno (Live 11-9)',
+          matchInfo: 'Match Complete • Vitality wins Grand Final 3-1 (Inferno 13-9)',
           customStats: [
             { label: 'Tournament', value: 'StarSeries Fall 2026' },
-            { label: 'Prize Pool', value: '$500,000 USD' },
+            { label: 'Champion', value: 'Team Vitality ($250,000)' },
             { label: 'Map 1 (Nuke)', value: '13-8 (Vitality)' },
             { label: 'Map 2 (Mirage)', value: '11-13 (Aurora)' },
             { label: 'Map 3 (Anubis)', value: '13-10 (Vitality)' },
-            { label: 'Current Map', value: 'Inferno (Vitality 11 - 9 Aurora)' }
+            { label: 'Map 4 (Inferno)', value: '13-9 (Vitality)' }
           ]
         },
         poll: {
-          question: 'Can Aurora Gaming force a deciding Map 5 on Train?',
+          question: 'Who was the most impactful player of the StarSeries Fall 2026 Grand Final?',
           options: [
-            { text: 'Yes, Aurora will mount the comeback', votes: 47 },
-            { text: 'No, Vitality will close out the championship', votes: 122 }
+            { text: 'ZywOo (Vitality - Finals MVP)', votes: 184 },
+            { text: 'flameZ (Vitality - Entry Anchor)', votes: 62 },
+            { text: 'deko (Aurora - Top Fragger)', votes: 41 }
           ]
         },
         updates: [
+          {
+            title: 'FINAL RESULT: Vitality Crowned StarSeries Champions!',
+            content: 'Team Vitality claims the CS2 StarSeries Fall 2026 championship trophy with a 3-1 series triumph over Aurora Gaming! ZywOo is awarded Grand Finals MVP after delivering a masterclass on Map 4 Inferno.',
+            createdAt: new Date(baseNow)
+          },
+          {
+            title: 'CHAMPIONSHIP POINT: Vitality 13 - 9 Aurora',
+            content: 'Vitality converts their championship point on Inferno! Spinx anchors the A-site pit defense, cutting down the final two attackers to seal Map 4 with a 13-9 victory and secure the Grand Final 3-1!',
+            createdAt: new Date(baseNow - 1 * 60 * 1000)
+          },
+          {
+            title: 'Round 21: Vitality 12 - 9 Aurora',
+            content: 'Vitality executes a clinical B split. ZywOo opens with an entry frag on Banana, paving the way for Vitality to plant the bomb and reach tournament point.',
+            createdAt: new Date(baseNow - 2 * 60 * 1000)
+          },
           {
             title: 'Round 20: ZywOo 1v2 Clutch on B Site!',
             content: 'Vitality 11 - 9 Aurora. With the bomb planted on B Site, ZywOo finds two crisp AWP frags through smoke to secure match point buffer for Vitality!',
@@ -405,27 +399,33 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         title: 'Global Geopolitics Live: Geneva Emergency Talks on Strait of Hormuz Navigation & Oil Security',
         description: 'Instant bulletins and diplomatic analysis as US, European, Iranian, and Gulf representatives hold high-stakes emergency negotiations on Persian Gulf maritime corridors.',
         category: 'politics',
-        mainImageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80',
+        mainImageUrl: '',
+        isLive: false,
         author: 'Global Affairs Newsroom',
         matchStatus: {
-          team1: { name: 'Western Coalition', score: 'Draft Communique 4' },
-          team2: { name: 'Regional Mediators', score: 'Oman Protocol B' },
-          matchInfo: 'Geneva Peace Palace • Ministerial Emergency Session',
+          team1: { name: 'Western Coalition', score: 'Joint Protocol Signed' },
+          team2: { name: 'Regional Mediators', score: 'Consensus Accord' },
+          matchInfo: 'Session Concluded • Joint Maritime Corridor Agreement Reached',
           customStats: [
             { label: 'Host & Mediator', value: 'Switzerland & Oman' },
             { label: 'Core Transit Zone', value: 'Strait of Hormuz' },
-            { label: 'Oil Market Impact', value: 'Brent Crude $86.40/bbl' },
-            { label: 'Delegation Status', value: 'Minister-level closed consultations' }
+            { label: 'Oil Market Impact', value: 'Brent Crude stabilized at $84.20/bbl' },
+            { label: 'Resolution Status', value: 'Signed technical de-escalation protocol' }
           ]
         },
         poll: {
-          question: 'Will international diplomatic mediation produce a binding maritime transit agreement?',
+          question: 'Will international diplomatic mediation produce long-term maritime transit stability?',
           options: [
             { text: 'Yes, both sides face intense economic pressure', votes: 89 },
             { text: 'No, fundamental disagreements remain unresolved', votes: 71 }
           ]
         },
         updates: [
+          {
+            title: 'CONCLUDED: Joint Statement Released on Strait of Hormuz Transit Protocol',
+            content: 'Delegations from Switzerland, Oman, the US, European Union, and regional stakeholders conclude ministerial emergency talks in Geneva with a signed framework ensuring safe passage corridors for commercial energy shipping.',
+            createdAt: new Date(baseNow)
+          },
           {
             title: '17:15 GMT: European Mediators Present 5-Point De-escalation Memo',
             content: 'European Union foreign policy representatives have formally tabled a 5-point proposal providing commercial ship escorts alongside monitored maritime corridors.',
@@ -448,17 +448,18 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         title: 'AI Economy Keynote Live: Meta Launches Autonomous Agent "Muse" & Subscription Management Engine',
         description: 'Real-time announcements, technical architecture breakdowns, and Wall Street financial impact analysis as Meta introduces agentic AI assistant Muse.',
         category: 'technology',
-        mainImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+        mainImageUrl: '',
+        isLive: false,
         author: 'Silicon Valley Technology Desk',
         matchStatus: {
           team1: { name: 'Agent Capabilities', score: '100% Autonomous' },
-          team2: { name: 'Platform Rollout', score: 'Phase 1 Beta' },
-          matchInfo: 'Meta Global Keynote • Menlo Park, California',
+          team2: { name: 'Platform Rollout', score: 'Phase 1 Beta Live' },
+          matchInfo: 'Keynote Concluded • Developer SDK Live on GitHub & Cloud APIs',
           customStats: [
             { label: 'Featured Speaker', value: 'Mark Zuckerberg' },
             { label: 'Core Architecture', value: 'Llama 4 Multi-Agentic Engine' },
             { label: 'Target Disruption', value: 'Subscription Economy & Auto-Audits' },
-            { label: 'Developer SDK', value: 'Live on GitHub & Cloud APIs' }
+            { label: 'Developer SDK', value: 'Available immediately' }
           ]
         },
         poll: {
@@ -469,6 +470,11 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
           ]
         },
         updates: [
+          {
+            title: 'KEYNOTE CONCLUDED: Developer SDK and Beta Rollout Commenced',
+            content: 'Meta concludes its 90-minute global keynote. Developers can now access the Muse agentic runtime SDK on GitHub, with consumer rollout beginning next month across WhatsApp and Messenger.',
+            createdAt: new Date(baseNow)
+          },
           {
             title: 'Demo: Muse Cancels Inactive Streaming Subscription in 3 Seconds',
             content: 'On stage, Zuckerberg demonstrates Muse identifying a forgotten recurring $18/month gym subscription, navigating the cancellation flow, and depositing savings into a high-yield account.',
@@ -494,15 +500,15 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
       if (!liveBlog) {
         liveBlog = await LiveBlog.create({
           ...seed,
-          isLive: true,
+          isLive: seed.isLive !== undefined ? seed.isLive : false,
           tags: [seed.category, 'Live Coverage', 'Breaking']
         });
       } else {
         liveBlog.title = seed.title;
         liveBlog.description = seed.description;
         liveBlog.category = seed.category;
-        liveBlog.isLive = true;
-        liveBlog.mainImageUrl = seed.mainImageUrl;
+        liveBlog.isLive = seed.isLive !== undefined ? seed.isLive : false;
+        liveBlog.mainImageUrl = seed.mainImageUrl || '';
         liveBlog.matchStatus = seed.matchStatus;
         liveBlog.poll = seed.poll;
         liveBlog.updates = seed.updates;

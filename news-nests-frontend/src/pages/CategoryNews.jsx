@@ -66,76 +66,84 @@ export default function CategoryNews() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {articles.map((article) => (
-              <div 
-                key={article._id}
-                onClick={() => {
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.set('articleId', article.slug || article._id);
-                  setSearchParams(newParams);
-                }}
-                className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-shadow"
-              >
-                <div className="relative w-full aspect-[16/10] max-h-[145px] sm:max-h-none bg-muted overflow-hidden shrink-0">
-                  {article.mediaUrls && article.mediaUrls.length > 1 ? (
-                    <div className="w-full h-full flex overflow-hidden">
-                      <SafeImage 
-                        src={article.mediaUrls[0]} 
-                        alt={article.title} 
-                        category={article.category || categoryName}
-                        subCategory={article.subCategory}
-                        country={article.country}
-                        className="w-1/2 h-full object-cover pr-[1px] transition-transform duration-300 group-hover:scale-105"
-                      />
-                      {article.mediaUrls.length > 2 ? (
-                        <div className="w-1/2 h-full flex flex-col pl-[1px] overflow-hidden">
+            {articles.map((article) => {
+              const cleanMediaUrls = (article.mediaUrls || []).filter(u => u && !u.includes('unsplash.com'));
+              const singleImg = (article.imageUrl || article.mainImageUrl);
+              const validSingleImg = (singleImg && !singleImg.includes('unsplash.com')) ? singleImg : null;
+              const hasMedia = cleanMediaUrls.length > 0 || Boolean(validSingleImg);
+
+              return (
+                <div 
+                  key={article._id}
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.set('articleId', article.slug || article._id);
+                    setSearchParams(newParams);
+                  }}
+                  className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-shadow"
+                >
+                  {hasMedia && (
+                    <div className="relative w-full aspect-[16/10] max-h-[145px] sm:max-h-none bg-muted overflow-hidden shrink-0">
+                      {cleanMediaUrls.length > 1 ? (
+                        <div className="w-full h-full flex overflow-hidden">
                           <SafeImage 
-                            src={article.mediaUrls[1]} 
-                            alt={article.title}
+                            src={cleanMediaUrls[0]} 
+                            alt={article.title} 
                             category={article.category || categoryName}
                             subCategory={article.subCategory}
                             country={article.country}
-                            className="w-full h-1/2 object-cover pb-[1px] transition-transform duration-300 group-hover:scale-105" 
+                            className="w-1/2 h-full object-cover pr-[1px] transition-transform duration-300 group-hover:scale-105"
                           />
-                          <div className="relative w-full h-1/2 pt-[1px] overflow-hidden">
+                          {cleanMediaUrls.length > 2 ? (
+                            <div className="w-1/2 h-full flex flex-col pl-[1px] overflow-hidden">
+                              <SafeImage 
+                                src={cleanMediaUrls[1]} 
+                                alt={article.title}
+                                category={article.category || categoryName}
+                                subCategory={article.subCategory}
+                                country={article.country}
+                                className="w-full h-1/2 object-cover pb-[1px] transition-transform duration-300 group-hover:scale-105" 
+                              />
+                              <div className="relative w-full h-1/2 pt-[1px] overflow-hidden">
+                                <SafeImage 
+                                  src={cleanMediaUrls[2]} 
+                                  alt={article.title} 
+                                  category={article.category || categoryName}
+                                  subCategory={article.subCategory}
+                                  country={article.country}
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                />
+                                {cleanMediaUrls.length > 3 && (
+                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-xs pointer-events-none mt-[1px]">
+                                    +{cleanMediaUrls.length - 3}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
                             <SafeImage 
-                              src={article.mediaUrls[2]} 
-                              alt={article.title}
+                              src={cleanMediaUrls[1]} 
+                              alt={article.title} 
                               category={article.category || categoryName}
                               subCategory={article.subCategory}
                               country={article.country}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                              className="w-1/2 h-full object-cover pl-[1px] transition-transform duration-300 group-hover:scale-105"
                             />
-                            {article.mediaUrls.length > 3 && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-xs pointer-events-none mt-[1px]">
-                                +{article.mediaUrls.length - 3}
-                              </div>
-                            )}
-                          </div>
+                          )}
                         </div>
                       ) : (
                         <SafeImage 
-                          src={article.mediaUrls[1]} 
-                          alt={article.title} 
+                          src={cleanMediaUrls[0] || validSingleImg} 
+                          alt={article.title}
                           category={article.category || categoryName}
                           subCategory={article.subCategory}
                           country={article.country}
-                          className="w-1/2 h-full object-cover pl-[1px] transition-transform duration-300 group-hover:scale-105"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       )}
                     </div>
-                  ) : (
-                    <SafeImage 
-                      src={article.imageUrl || article.mainImageUrl} 
-                      alt={article.title}
-                      category={article.category || categoryName}
-                      subCategory={article.subCategory}
-                      country={article.country}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
                   )}
-                </div>
-                <div className="p-4 flex flex-col flex-1">
+                  <div className="p-4 flex flex-col flex-1">
                   <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block mb-1">
                     {article.category || categoryName}
                   </span>
@@ -152,7 +160,8 @@ export default function CategoryNews() {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
       </div>

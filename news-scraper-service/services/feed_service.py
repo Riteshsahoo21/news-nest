@@ -156,13 +156,9 @@ async def fetch_single_feed(client: httpx.AsyncClient, feed_meta: dict) -> List[
                     if src:
                         image_url = clean_and_resolve_image_url(src, link)
 
-            # Guaranteed high-resolution editorial fallback image if none provided by feed
-            if not image_url:
-                image_url = get_category_fallback_image(
-                    feed_meta.get("category", ""),
-                    feed_meta.get("subCategory", ""),
-                    feed_meta.get("country", "")
-                )
+            # If no real image was provided by the feed or content, keep image_url empty
+            if not image_url or "unsplash.com" in image_url:
+                image_url = ""
 
             published = entry.get("published", "") or entry.get("updated", "")
 

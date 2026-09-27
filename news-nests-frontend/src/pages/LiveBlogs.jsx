@@ -303,18 +303,24 @@ export default function LiveBlogs() {
                     <div className="flex-1 flex flex-col">
                       {/* Image Header */}
                       <div className="h-56 shrink-0 relative overflow-hidden bg-slate-100 dark:bg-[#0b0e14]">
-                        {blog.mainImageUrl ? (
+                        {blog.mainImageUrl && !blog.mainImageUrl.includes('unsplash.com') ? (
                           <img
                             src={blog.mainImageUrl}
                             alt={blog.title}
                             referrerPolicy="no-referrer"
                             crossOrigin="anonymous"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                           />
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-slate-400 dark:text-gray-600">
-                            <Radio className="w-12 h-12 opacity-30 mb-2 text-red-500" />
-                            <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-slate-400 dark:text-gray-400">Editorial Stream</span>
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-400 p-6 text-center select-none">
+                            <div className="w-12 h-12 rounded-2xl bg-red-600/10 border border-red-600/20 flex items-center justify-center mb-3 shadow-inner">
+                              <Radio className={`w-6 h-6 ${isLive ? 'text-red-500 animate-pulse' : 'text-slate-500'}`} />
+                            </div>
+                            <span className="text-[11px] font-mono font-extrabold tracking-widest uppercase text-slate-200">
+                              {blog.category?.toUpperCase() || 'EDITORIAL'} {isLive ? 'LIVE DESK' : 'ARCHIVE'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-sans mt-1">Real-Time Newsroom Telemetry</span>
                           </div>
                         )}
 

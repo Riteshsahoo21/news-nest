@@ -278,45 +278,60 @@ export default function ArticleDetails() {
             </div>
           </header>
 
-          {article.mediaUrls && article.mediaUrls.length > 1 ? (
-            <div className="mb-10 grid gap-4">
-              <figure className="rounded-xl overflow-hidden shadow-lg border border-border/50">
-                <SafeImage 
-                  src={article.mediaUrls[0].startsWith('http') ? article.mediaUrls[0] : `http://localhost:5000/${article.mediaUrls[0].replace('\\', '/')}`} 
-                  alt={article.title} 
-                  category={article.category}
-                  subCategory={article.subCategory}
-                  country={article.country}
-                  className="w-full max-h-[500px] object-cover" 
-                />
-              </figure>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {article.mediaUrls.slice(1).map((url, idx) => (
-                  <figure key={idx} className="rounded-xl overflow-hidden shadow-md border border-border/50">
+          {(() => {
+            const cleanMediaUrls = (article.mediaUrls || []).filter(u => u && !u.includes('unsplash.com'));
+            const singleImg = article.imageUrl || article.mainImageUrl;
+            const validSingleImg = (singleImg && !singleImg.includes('unsplash.com')) ? singleImg : null;
+
+            if (cleanMediaUrls.length > 1) {
+              return (
+                <div className="mb-10 grid gap-4">
+                  <figure className="rounded-xl overflow-hidden shadow-lg border border-border/50">
                     <SafeImage 
-                      src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
-                      alt={`${article.title} - Media ${idx + 2}`} 
+                      src={cleanMediaUrls[0].startsWith('http') ? cleanMediaUrls[0] : `http://localhost:5000/${cleanMediaUrls[0].replace('\\', '/')}`} 
+                      alt={article.title} 
                       category={article.category}
                       subCategory={article.subCategory}
                       country={article.country}
-                      className="w-full h-32 object-cover transition-transform hover:scale-105" 
+                      className="w-full max-h-[500px] object-cover" 
                     />
                   </figure>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <figure className="mb-10 rounded-xl overflow-hidden shadow-lg border border-border/50">
-              <SafeImage 
-                src={article.imageUrl || article.mainImageUrl} 
-                alt={article.title} 
-                category={article.category}
-                subCategory={article.subCategory}
-                country={article.country}
-                className="w-full max-h-[500px] object-cover" 
-              />
-            </figure>
-          )}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {cleanMediaUrls.slice(1).map((url, idx) => (
+                      <figure key={idx} className="rounded-xl overflow-hidden shadow-md border border-border/50">
+                        <SafeImage 
+                          src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
+                          alt={`${article.title} - Media ${idx + 2}`} 
+                          category={article.category}
+                          subCategory={article.subCategory}
+                          country={article.country}
+                          className="w-full h-32 object-cover transition-transform hover:scale-105" 
+                        />
+                      </figure>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            const hero = cleanMediaUrls[0] || validSingleImg;
+            if (hero) {
+              return (
+                <figure className="mb-10 rounded-xl overflow-hidden shadow-lg border border-border/50">
+                  <SafeImage 
+                    src={hero.startsWith('http') ? hero : `http://localhost:5000/${hero.replace('\\', '/')}`} 
+                    alt={article.title} 
+                    category={article.category}
+                    subCategory={article.subCategory}
+                    country={article.country}
+                    className="w-full max-h-[500px] object-cover" 
+                  />
+                </figure>
+              );
+            }
+
+            return null;
+          })()}
 
           <div className="prose prose-lg dark:prose-invert max-w-none">
             <p className="text-xl text-muted-foreground leading-relaxed mb-8 font-medium">
