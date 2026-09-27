@@ -202,6 +202,7 @@ export const syncMetadataFeeds = async (options = {}) => {
     let updatedCount = 0;
     let rejectedCount = 0;
     let skippedCompleteCount = 0;
+    let acceptedCount = 0;
 
     const validMetadata = articles.filter((article) => (
       article?.title?.trim().length >= 10 &&
@@ -225,6 +226,9 @@ export const syncMetadataFeeds = async (options = {}) => {
         skippedCompleteCount++;
         continue;
       }
+      candidates.push({ metadata: article, existing });
+    }
+
     // For live search/location discovery: Save lightweight metadata records immediately so search results appear in ~1.5s!
     if (isLiveDiscovery && candidates.length > 0) {
       for (const { metadata: article, existing } of candidates) {
@@ -287,8 +291,6 @@ export const syncMetadataFeeds = async (options = {}) => {
     );
     const extractionCandidates = candidates.slice(0, maximumCandidates);
     const extractionTimeoutMs = isLiveDiscovery ? 18000 : 45000;
-
-    let acceptedCount = 0;
     for (let index = 0; index < extractionCandidates.length && acceptedCount < targetLimit; index += EXTRACTION_CONCURRENCY) {
       const batch = extractionCandidates.slice(index, index + EXTRACTION_CONCURRENCY);
       const results = await Promise.all(batch.map(({ metadata }) => (
