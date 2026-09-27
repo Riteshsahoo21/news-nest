@@ -52,7 +52,9 @@ NOISE_PATTERNS = [
     r'visit g\.co/privacytools',
     r'managing your privacy settings',
     r'cookie (policy|notice|preferences|settings)',
-    r'consent (preferences|manager)'
+    r'consent (preferences|manager)',
+    r'deliver and maintain google services',
+    r'track outages and protect against spam'
 ]
 
 NOISE_SELECTORS = [
@@ -128,7 +130,7 @@ def clean_extracted_text(text: str) -> str:
 
     joined = "\n\n".join(final_paras)
     cleaned = re.sub(r"\n{3,}", "\n\n", joined).strip()
-    if len(cleaned) < 50 or re.search(r'we use cookies and data|g\.co/privacytools', cleaned, re.IGNORECASE):
+    if len(cleaned) < 50 or re.search(r'we use cookies and data|g\.co/privacytools|deliver and maintain google services', cleaned, re.IGNORECASE):
         return ""
     return cleaned
 

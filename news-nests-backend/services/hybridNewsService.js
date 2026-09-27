@@ -51,11 +51,11 @@ export const isCompleteScrapedArticle = (article) => {
   const takeaways = Array.isArray(article.keyTakeaways)
     ? article.keyTakeaways.filter((item) => typeof item === 'string' && item.trim())
     : [];
+  const imageUrl = typeof article.imageUrl === 'string' ? article.imageUrl.trim() : '';
 
   return Boolean(
     article.isFullContentFetched &&
-    article.imageUrl &&
-    !article.imageUrl.includes('unsplash.com') &&
+    !imageUrl.includes('unsplash.com') &&
     content.length >= MIN_COMPLETE_CONTENT_LENGTH &&
     !/we use cookies and data/i.test(content) &&
     isHttpUrl(article.sourceUrl) &&
@@ -437,7 +437,13 @@ export const getFullArticleContent = async (articleDoc) => {
       const extractedBody = cleanArticleText(extracted.content);
       const existingBody = cleanArticleText(articleDoc.content || '');
       const cleanedBody = extractedBody.length >= existingBody.length ? extractedBody : existingBody;
-      if (cleanedBody.length >= 100 && !/we use cookies and data/i.test(cleanedBody) && !/privacytools/i.test(cleanedBody)) {
+      if (
+        cleanedBody.length >= 100 && 
+        !/we use cookies and data/i.test(cleanedBody) && 
+        !/privacytools/i.test(cleanedBody) && 
+        !/deliver and maintain google services/i.test(cleanedBody) &&
+        !/accept all/i.test(cleanedBody)
+      ) {
         const mediaList = Array.from(new Set(
           (Array.isArray(extracted.mediaUrls) ? extracted.mediaUrls : []).filter(u => u && !u.includes('unsplash.com'))
         ));
