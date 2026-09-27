@@ -127,7 +127,7 @@ def build_discovery_query(
     normalized_subcategory = (sub_category or "").strip().lower()
     normalized_category = (category or "").strip().lower()
     topic_key = "esports" if normalized_subcategory == "esports" else normalized_category
-    if topic_key in CATEGORY_QUERIES and (not clean_query or category or sub_category):
+    if topic_key in CATEGORY_QUERIES and not clean_query:
         parts.append(CATEGORY_QUERIES[topic_key])
 
     locations = [_quoted(value) for value in (city, region) if _clean_query_part(value, 100)]
@@ -154,7 +154,7 @@ def _country_settings(country: Optional[str]) -> dict:
     code = (country or "").strip().lower()
     return COUNTRY_SETTINGS.get(
         code,
-        {"name": "", "hl": "en-US", "gl": "US", "ceid": "US:en", "mkt": "en-US"},
+        {"name": "India", "hl": "en-IN", "gl": "IN", "ceid": "IN:en", "mkt": "en-IN"},
     )
 
 
@@ -546,28 +546,44 @@ async def fetch_google_news_metadata(
     if cached is not None:
         return cached
 
-    try:
-        response = await client.get(
-            "https://news.google.com/rss/search",
-            params={"q": provider_query, "hl": settings["hl"], "gl": settings["gl"], "ceid": settings["ceid"]},
-            timeout=12.0,
-        )
-        response.raise_for_status()
-        entries = feedparser.parse(response.content).entries[: min(max(limit * 2, 8), 24)]
-    except Exception:
-        return []
+    # Query both targeted region and complementary region if global/unspecified
+    regions_to_fetch = [settings]
+    if not country or country.lower() in ("all", "global"):
+        regions_to_fetch = [
+            COUNTRY_SETTINGS["in"],
+            COUNTRY_SETTINGS["us"]
+        ]
 
-    semaphore = asyncio.Semaphore(4)
+    entries = []
+    seen_links = set()
 
-    async def resolve(entry):
-        async with semaphore:
-            return await decode_google_news_url(client, entry.get("link", ""))
+    for s in regions_to_fetch:
+        try:
+            response = await client.get(
+                "https://news.google.com/rss/search",
+                params={"q": provider_query, "hl": s["hl"], "gl": s["gl"], "ceid": s["ceid"]},
+                timeout=7.0,
+            )
+            if response.status_code == 200:
+                parsed = feedparser.parse(response.content)
+                for entry in parsed.entries[: min(max(limit * 2, 8), 30)]:
+                    link = entry.get("link", "")
+                    if link and link not in seen_links:
+                        seen_links.add(link)
+                        entries.append((entry, s))
+        except Exception:
+            pass
 
-    resolved_urls = await asyncio.gather(*(resolve(entry) for entry in entries))
     results: List[NewsItemMetadata] = []
-    for entry, source_url in zip(entries, resolved_urls):
+    for entry, s in entries:
+        raw_link = entry.get("link", "")
+        # Fast non-blocking URL unwrap: check legacy base64 or keep valid RSS redirect link
+        article_id = _extract_google_article_id(raw_link)
+        legacy_url = _decode_legacy_google_id(article_id) if article_id else ""
+        source_url = legacy_url or _normalize_url(raw_link)
         if not source_url:
             continue
+
         source = entry.get("source") or {}
         source_name = source.get("title", "") if isinstance(source, dict) else str(source)
         article = _metadata(
@@ -579,14 +595,14 @@ async def fetch_google_news_metadata(
             provider="google-news-rss",
             requested_category=category,
             sub_category=sub_category,
-            country=country or "global",
+            country=country or ("in" if s["gl"] == "IN" else "global"),
             language=language or "en",
             city=city,
             region=region,
         )
         if article:
             results.append(article)
-        if len(results) >= limit:
+        if len(results) >= limit * 2:
             break
 
     _cache_set(cache_key, results)
@@ -622,40 +638,50 @@ async def fetch_bing_news_metadata(
     if cached is not None:
         return cached
 
-    try:
-        response = await client.get(
-            "https://www.bing.com/news/search",
-            params={"q": provider_query, "format": "rss", "mkt": settings["mkt"]},
-            timeout=12.0,
-        )
-        response.raise_for_status()
-        entries = feedparser.parse(response.content).entries[: min(max(limit * 2, 8), 30)]
-    except Exception:
-        return []
+    regions_to_fetch = [settings["mkt"]]
+    if not country or country.lower() in ("all", "global"):
+        regions_to_fetch = ["en-IN", "en-US"]
 
     results: List[NewsItemMetadata] = []
-    for entry in entries:
-        source_url = _unwrap_bing_url(entry.get("link", ""))
-        source = entry.get("source") or entry.get("news_source") or {}
-        source_name = source.get("title", "") if isinstance(source, dict) else str(source)
-        article = _metadata(
-            title=entry.get("title", ""),
-            summary=entry.get("summary", "") or entry.get("description", ""),
-            source_url=source_url,
-            source_name=source_name,
-            published_at=entry.get("published", "") or entry.get("updated", ""),
-            provider="bing-news-rss",
-            requested_category=category,
-            sub_category=sub_category,
-            country=country or "global",
-            language=language or "en",
-            city=city,
-            region=region,
-        )
-        if article:
-            results.append(article)
-        if len(results) >= limit:
-            break
+    seen_titles = set()
+
+    for mkt in regions_to_fetch:
+        try:
+            response = await client.get(
+                "https://www.bing.com/news/search",
+                params={"q": provider_query, "format": "rss", "mkt": mkt},
+                timeout=7.0,
+            )
+            if response.status_code == 200:
+                entries = feedparser.parse(response.content).entries[: min(max(limit * 2, 8), 30)]
+                for entry in entries:
+                    t = entry.get("title", "")
+                    if not t or t in seen_titles:
+                        continue
+                    seen_titles.add(t)
+                    source_url = _unwrap_bing_url(entry.get("link", ""))
+                    source = entry.get("source") or entry.get("news_source") or {}
+                    source_name = source.get("title", "") if isinstance(source, dict) else str(source)
+                    article = _metadata(
+                        title=t,
+                        summary=entry.get("summary", "") or entry.get("description", ""),
+                        source_url=source_url,
+                        source_name=source_name,
+                        published_at=entry.get("published", "") or entry.get("updated", ""),
+                        provider="bing-news-rss",
+                        requested_category=category,
+                        sub_category=sub_category,
+                        country=country or ("in" if mkt == "en-IN" else "global"),
+                        language=language or "en",
+                        city=city,
+                        region=region,
+                    )
+                    if article:
+                        results.append(article)
+                    if len(results) >= limit * 2:
+                        break
+        except Exception:
+            pass
 
     _cache_set(cache_key, results)
     return results
@@ -687,10 +713,22 @@ async def fetch_discovery_metadata(
         "region": region,
         "limit": provider_limit,
     }
-    gdelt, google, bing = await asyncio.gather(
-        fetch_gdelt_metadata(client, provider_query, **common),
-        fetch_google_news_metadata(client, provider_query, **common),
-        fetch_bing_news_metadata(client, provider_query, **common),
+
+    # Run Google News and Bing News concurrently with strict fast timeouts
+    google_task = fetch_google_news_metadata(client, provider_query, **common)
+    bing_task = fetch_bing_news_metadata(client, provider_query, **common)
+
+    # GDELT runs with a 2-second timeout guard so it never blocks live search
+    async def get_gdelt_safe():
+        try:
+            return await asyncio.wait_for(fetch_gdelt_metadata(client, provider_query, **common), timeout=2.5)
+        except Exception:
+            return []
+
+    google, bing, gdelt = await asyncio.gather(
+        google_task,
+        bing_task,
+        get_gdelt_safe(),
     )
     return {
         "gdelt": gdelt,
