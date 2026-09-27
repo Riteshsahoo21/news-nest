@@ -7,6 +7,7 @@ export const escapeRegExp = (value = '') => (
 
 export const KNOWN_ENTITIES = [
   { canonical: 'carry minati', aliases: ['carry minati', 'carryminati', 'ajey nagar'] },
+  { canonical: 'fukra insaan', aliases: ['fukra insaan', 'fukrainsaan', 'fkura insaan', 'abhishek malhan'] },
   { canonical: 'skrossi', aliases: ['skrossi', 'sk rossi', 'sk-rossi', 'ganesh gangadhar'] },
   { canonical: 'motu patlu', aliases: ['motu patlu', 'motupatlu'] },
   { canonical: 'shubman gill', aliases: ['shubman gill', 'shubmangill'] },

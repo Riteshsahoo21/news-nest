@@ -45,10 +45,14 @@ export default function SafeImage({
   subCategory = '',
   country = '',
   loading = 'lazy',
-  style = {}
+  style = {},
+  allowFallback = true
 }) {
-  const fallbackUrl = getCategoryFallback(category, subCategory, country);
-  const initialUrl = (src && src.trim() && src !== 'null' && src !== 'undefined') ? src.trim() : fallbackUrl;
+  const isUnsplash = (url) => typeof url === 'string' && url.includes('unsplash.com');
+  const fallbackUrl = allowFallback ? getCategoryFallback(category, subCategory, country) : '';
+  const initialUrl = (src && src.trim() && src !== 'null' && src !== 'undefined' && (!isUnsplash(src) || allowFallback)) 
+    ? src.trim() 
+    : fallbackUrl;
 
   const [imgSrc, setImgSrc] = useState(initialUrl);
   const [triedProxy, setTriedProxy] = useState(false);
@@ -56,15 +60,17 @@ export default function SafeImage({
 
   // Sync state if src changes
   useEffect(() => {
-    const valid = (src && src.trim() && src !== 'null' && src !== 'undefined') ? src.trim() : fallbackUrl;
+    const valid = (src && src.trim() && src !== 'null' && src !== 'undefined' && (!isUnsplash(src) || allowFallback)) 
+      ? src.trim() 
+      : fallbackUrl;
     setImgSrc(valid);
     setTriedProxy(false);
     setIsLoaded(false);
-  }, [src, category, subCategory, country]);
+  }, [src, category, subCategory, country, allowFallback]);
 
   const handleError = () => {
     // Stage 1: If direct external URL failed and we haven't tried proxy yet, try backend image proxy
-    if (!triedProxy && imgSrc && imgSrc.startsWith('http') && !imgSrc.includes('unsplash.com') && !imgSrc.includes('/api/news/image-proxy')) {
+    if (!triedProxy && imgSrc && imgSrc.startsWith('http') && !isUnsplash(imgSrc) && !imgSrc.includes('/api/news/image-proxy')) {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       const proxyUrl = `${backendUrl}/api/news/image-proxy?url=${encodeURIComponent(imgSrc)}`;
       setTriedProxy(true);
@@ -72,11 +78,15 @@ export default function SafeImage({
       return;
     }
 
-    // Stage 2: If proxy also fails, or URL is invalid, fall back to curated category editorial image
-    if (imgSrc !== fallbackUrl) {
+    // Stage 2: If proxy also fails, or URL is invalid, fall back only if allowFallback is true
+    if (allowFallback && fallbackUrl && imgSrc !== fallbackUrl) {
       setImgSrc(fallbackUrl);
+    } else {
+      setImgSrc('');
     }
   };
+
+  if (!imgSrc) return null;
 
   return (
     <img

@@ -182,10 +182,28 @@ export const globalSearch = async (req, res) => {
         .select('title slug subtitle summary category imageUrl mainImageUrl publishedAt views');
     }
 
+    const stripUnsplashFallbackImages = (item) => {
+      if (!item) return item;
+      const doc = item.toObject ? item.toObject() : { ...item };
+      const isUnsplash = (url) => typeof url === 'string' && url.includes('unsplash.com');
+      if (isUnsplash(doc.imageUrl)) doc.imageUrl = '';
+      if (isUnsplash(doc.mainImageUrl)) doc.mainImageUrl = '';
+      if (Array.isArray(doc.mediaUrls)) {
+        doc.mediaUrls = doc.mediaUrls.filter((u) => !isUnsplash(u));
+      }
+      return doc;
+    };
+
     return res.json({
       query,
       didYouMean,
-      results: { news, liveBlogs, videos, photoGalleries, recommendations },
+      results: { 
+        news: news.map(stripUnsplashFallbackImages), 
+        liveBlogs, 
+        videos, 
+        photoGalleries, 
+        recommendations 
+      },
       totals,
       totalMatches: Object.values(totals).reduce((sum, count) => sum + count, 0),
       discovery,

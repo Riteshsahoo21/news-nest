@@ -534,18 +534,16 @@ export default function ArticleModal({ articleId, onClose }) {
                       ))}
                     </div>
                   </div>
-                ) : (
+                ) : (article.imageUrl || article.mainImageUrl) && !(article.imageUrl || article.mainImageUrl).includes('unsplash.com') ? (
                   <figure className="mb-6 rounded-xl overflow-hidden shadow-sm border border-border/50">
                     <SafeImage 
                       src={article.imageUrl ? (article.imageUrl.startsWith('http') ? article.imageUrl : `http://localhost:5000/${article.imageUrl.replace('\\', '/')}`) : article.mainImageUrl} 
                       alt={article.title} 
-                      category={article.category}
-                      subCategory={article.subCategory}
-                      country={article.country}
+                      allowFallback={false}
                       className="w-full h-auto object-cover max-h-[500px]" 
                     />
                   </figure>
-                )}
+                ) : null}
 
                 <AiSummaryCard
                   aiSummary={article.aiSummary}

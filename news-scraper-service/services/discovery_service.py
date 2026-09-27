@@ -321,8 +321,6 @@ def _metadata(
     resolved_category = _classify_category(title, requested_category, normalized_subcategory)
     normalized_country = (country or "global").strip().lower() or "global"
     image_url = _normalize_url(image_url) if image_url else ""
-    if not image_url:
-        image_url = get_category_fallback_image(resolved_category, normalized_subcategory, normalized_country)
 
     clean_summary = _clean_text(summary, 500) or title
     return NewsItemMetadata(

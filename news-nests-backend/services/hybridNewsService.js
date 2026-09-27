@@ -235,9 +235,9 @@ export const syncMetadataFeeds = async (options = {}) => {
         if (!existing) {
           const objectId = new mongoose.Types.ObjectId();
           const cleanTitle = article.title.trim();
-          const cleanContent = selectRichestContent(article.content, article.summary, cleanTitle);
-          const fallbackImg = getCategoryFallbackImage(article.category, article.subCategory, article.country);
-          const imageUrl = article.imageUrl || fallbackImg;
+          const rawImg = typeof article.imageUrl === 'string' ? article.imageUrl.trim() : '';
+          const isUnsplash = rawImg.includes('unsplash.com');
+          const imageUrl = isUnsplash ? '' : rawImg;
           
           try {
             const created = await News.create({
@@ -251,6 +251,7 @@ export const syncMetadataFeeds = async (options = {}) => {
               author: String(article.author || article.sourceName || 'News Bureau').trim(),
               imageUrl: imageUrl,
               mainImageUrl: imageUrl,
+              mediaUrls: imageUrl ? [imageUrl] : [],
               category: String(article.category || 'general').toLowerCase(),
               subCategory: String(article.subCategory || '').toLowerCase(),
               country: String(article.country || 'all').toLowerCase(),
