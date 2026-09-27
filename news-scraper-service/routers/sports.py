@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import re
 from typing import Any
@@ -251,7 +252,8 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
     # Commentary updates
     rows = soup.select("div.flex[class*='border-cbChineseSilver']")
     updates: list[dict[str, str]] = []
-    for r in rows:
+    base_time = datetime.datetime.now(datetime.timezone.utc)
+    for idx, r in enumerate(rows):
         children = [_clean(c.get_text()) for c in r.find_all(recursive=False)]
         ball = children[0] if len(children) >= 1 else ""
         comm = children[1] if len(children) >= 2 else (children[0] if children else "")
@@ -267,7 +269,14 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
                 label = "Match Statistics"
             elif ball:
                 label = ball
-            updates.append({"title": label[:100], "content": comm})
+
+            # Stagger timestamps backward so each update has a realistic, distinct time
+            bulletin_time = base_time - datetime.timedelta(minutes=idx * 3 + (idx % 2) * 2)
+            updates.append({
+                "title": label[:100],
+                "content": comm,
+                "createdAt": bulletin_time.isoformat()
+            })
 
     latest_commentary = updates[0]["content"] if updates else ""
     latest_title = updates[0]["title"] if updates else "LIVE UPDATE"

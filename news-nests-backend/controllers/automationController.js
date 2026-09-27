@@ -304,14 +304,19 @@ export const syncLiveScore = async (req, res) => {
     }
 
     // Ingest newest updates first
-    for (const item of [...incomingUpdates].reverse()) {
+    const now = Date.now();
+    for (const [idx, item] of [...incomingUpdates].reverse().entries()) {
       const content = cleanString(item.content || item, 4000);
       const title = cleanString(item.title || 'LIVE UPDATE', 200);
       if (content && !liveBlog.updates.some((u) => u.content === content)) {
+        const itemDate = item.createdAt
+          ? new Date(item.createdAt)
+          : new Date(now - (incomingUpdates.length - 1 - idx) * 3 * 60 * 1000);
+
         liveBlog.updates.unshift({
           title,
           content,
-          createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+          createdAt: itemDate
         });
         appendedUpdate = true;
       }
@@ -323,7 +328,7 @@ export const syncLiveScore = async (req, res) => {
     if (isComplete) {
       const finalText = cleanString(score.result || score.status || 'Match complete.', 1000);
       if (finalText && !liveBlog.updates.some((update) => update.title === 'MATCH OVER' && update.content === finalText)) {
-        liveBlog.updates.unshift({ title: 'MATCH OVER', content: finalText });
+        liveBlog.updates.unshift({ title: 'MATCH OVER', content: finalText, createdAt: new Date() });
       }
     }
 
@@ -338,6 +343,7 @@ export const syncLiveScore = async (req, res) => {
 
 export const seedMultiCategoryLiveBlogs = async (req, res) => {
   try {
+    const baseNow = Date.now();
     const multiCategorySeeds = [
       {
         externalMatchId: 'esports_starseries_fall_2026',
@@ -369,19 +375,23 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         updates: [
           {
             title: 'Round 20: ZywOo 1v2 Clutch on B Site!',
-            content: 'Vitality 11 - 9 Aurora. With the bomb planted on B Site, ZywOo finds two crisp AWP frags through smoke to secure match point buffer for Vitality!'
+            content: 'Vitality 11 - 9 Aurora. With the bomb planted on B Site, ZywOo finds two crisp AWP frags through smoke to secure match point buffer for Vitality!',
+            createdAt: new Date(baseNow - 4 * 60 * 1000)
           },
           {
             title: 'Round 19: Aurora Answers with Fast Banana Push',
-            content: 'Vitality 10 - 9 Aurora. deko and KENSI open Banana with double HE grenades, overwhelming Vitality defenders and winning the round with zero casualties.'
+            content: 'Vitality 10 - 9 Aurora. deko and KENSI open Banana with double HE grenades, overwhelming Vitality defenders and winning the round with zero casualties.',
+            createdAt: new Date(baseNow - 12 * 60 * 1000)
           },
           {
             title: 'Halftime Switch: Vitality 9 - 6 Aurora',
-            content: 'Vitality concludes a dominant Counter-Terrorist half on Inferno. Apex orchestrates high-pressure middle control to shut down Aurora default executes.'
+            content: 'Vitality concludes a dominant Counter-Terrorist half on Inferno. Apex orchestrates high-pressure middle control to shut down Aurora default executes.',
+            createdAt: new Date(baseNow - 27 * 60 * 1000)
           },
           {
             title: 'Pistol Round: Vitality takes CT opener',
-            content: 'FlameZ secures a triple-kill with dualies in Apartments to kick off Map 4 for Team Vitality.'
+            content: 'FlameZ secures a triple-kill with dualies in Apartments to kick off Map 4 for Team Vitality.',
+            createdAt: new Date(baseNow - 48 * 60 * 1000)
           }
         ]
       },
@@ -413,15 +423,18 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         updates: [
           {
             title: '17:15 GMT: European Mediators Present 5-Point De-escalation Memo',
-            content: 'European Union foreign policy representatives have formally tabled a 5-point proposal providing commercial ship escorts alongside monitored maritime corridors.'
+            content: 'European Union foreign policy representatives have formally tabled a 5-point proposal providing commercial ship escorts alongside monitored maritime corridors.',
+            createdAt: new Date(baseNow - 9 * 60 * 1000)
           },
           {
             title: '16:30 GMT: Iranian Foreign Ministry Signals Willingness for Technical Talks',
-            content: 'Tehran foreign ministry spokespersons confirm participation in technical maritime security working groups while maintaining sovereign territorial waters claims.'
+            content: 'Tehran foreign ministry spokespersons confirm participation in technical maritime security working groups while maintaining sovereign territorial waters claims.',
+            createdAt: new Date(baseNow - 34 * 60 * 1000)
           },
           {
             title: '15:00 GMT: Joint Plenary Session Convenes in Geneva',
-            content: 'Delegates from 14 nations enter the main assembly chamber under strict diplomatic protocol to discuss international shipping insurance and energy transit guarantees.'
+            content: 'Delegates from 14 nations enter the main assembly chamber under strict diplomatic protocol to discuss international shipping insurance and energy transit guarantees.',
+            createdAt: new Date(baseNow - 72 * 60 * 1000)
           }
         ]
       },
@@ -453,15 +466,18 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         updates: [
           {
             title: 'Demo: Muse Cancels Inactive Streaming Subscription in 3 Seconds',
-            content: 'On stage, Zuckerberg demonstrates Muse identifying a forgotten recurring $18/month gym subscription, navigating the cancellation flow, and depositing savings into a high-yield account.'
+            content: 'On stage, Zuckerberg demonstrates Muse identifying a forgotten recurring $18/month gym subscription, navigating the cancellation flow, and depositing savings into a high-yield account.',
+            createdAt: new Date(baseNow - 6 * 60 * 1000)
           },
           {
             title: 'Security Architecture: Encrypted Local Enclaves Announced',
-            content: 'Meta Chief AI Scientist details the cryptographic sandboxing that prevents personal agents from exposing banking credentials to third-party services.'
+            content: 'Meta Chief AI Scientist details the cryptographic sandboxing that prevents personal agents from exposing banking credentials to third-party services.',
+            createdAt: new Date(baseNow - 26 * 60 * 1000)
           },
           {
             title: 'Keynote Starts: Zuckerberg Outlines Post-App Internet Strategy',
-            content: 'Mark Zuckerberg takes the stage in Menlo Park, declaring agentic AI personal assistants as the central computing interface of the next decade.'
+            content: 'Mark Zuckerberg takes the stage in Menlo Park, declaring agentic AI personal assistants as the central computing interface of the next decade.',
+            createdAt: new Date(baseNow - 59 * 60 * 1000)
           }
         ]
       }

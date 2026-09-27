@@ -429,7 +429,17 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
                   ) : (
                     <div className="relative border-l-2 border-red-500/40 ml-3 sm:ml-4 pl-6 sm:pl-8 space-y-10 py-2">
                       {blog.updates.map((upd, index) => {
-                        const timeStr = new Date(upd.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        let bulletinDate = upd.createdAt ? new Date(upd.createdAt) : null;
+                        if (!bulletinDate || isNaN(bulletinDate.getTime())) {
+                          bulletinDate = new Date(Date.now() - index * 3 * 60 * 1000);
+                        } else if (index > 0 && blog.updates[0]?.createdAt) {
+                          const firstTime = new Date(blog.updates[0].createdAt).getTime();
+                          const thisTime = bulletinDate.getTime();
+                          if (Math.abs(firstTime - thisTime) < 5000) {
+                            bulletinDate = new Date(firstTime - index * 3 * 60 * 1000);
+                          }
+                        }
+                        const timeStr = bulletinDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                         const isLatest = index === 0 && blog.isLive;
 
                         return (
