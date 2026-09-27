@@ -37,6 +37,14 @@ export const levenshteinDistance = (a = '', b = '') => {
 export const findClosestQueryCorrection = (query) => {
   if (!query || typeof query !== 'string') return null;
   const q = query.trim().toLowerCase();
+
+  // If already an exact recognized alias, no typo correction needed
+  for (const item of KNOWN_ENTITIES) {
+    if (item.aliases.includes(q) || item.canonical === q) {
+      return null;
+    }
+  }
+
   let bestMatch = null;
   let minDistance = Infinity;
 
@@ -44,7 +52,7 @@ export const findClosestQueryCorrection = (query) => {
     for (const alias of item.aliases) {
       const d = levenshteinDistance(q, alias);
       const maxAllowed = Math.min(2, Math.max(1, Math.floor(alias.length / 3)));
-      if (d <= maxAllowed && d < minDistance) {
+      if (d > 0 && d <= maxAllowed && d < minDistance) {
         minDistance = d;
         bestMatch = item.canonical;
       }

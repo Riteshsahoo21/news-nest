@@ -115,10 +115,10 @@ export const globalSearch = async (req, res) => {
     ]);
     let { news, total: newsTotal } = newsPage;
 
-    // Fallback 1: If a typo-corrected variant exists and yields more results or exact has 0
-    if (correctedQuery) {
+    // Fallback 1: If a typo-corrected variant exists and yields results
+    if (correctedQuery && correctedQuery.toLowerCase() !== query.toLowerCase()) {
       const correctedPage = await fetchRankedNewsPage({ query: correctedQuery, sort: req.query.sort, skip, limit });
-      if (correctedPage.total > newsTotal || newsTotal === 0) {
+      if (correctedPage.total >= newsTotal || newsTotal === 0) {
         newsPage = correctedPage;
         news = newsPage.news;
         newsTotal = newsPage.total;
