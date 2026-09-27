@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /live-blogs
+Allow: /article/*
+Allow: /category/*
+Allow: /videos
+Allow: /photo-gallery
+Disallow: /admin/*
+Disallow: /reporter/*
+Disallow: /editor/*
+Disallow: /live-blog-studio/*
+Disallow: /profile/*
+Disallow: /settings/*
+Disallow: /checkout/*
+Disallow: /payment-success
+Disallow: /payment-cancel
+
+Sitemap: http://localhost:5000/api/sitemap.xml
+Sitemap: http://localhost:5000/api/news-sitemap.xml
