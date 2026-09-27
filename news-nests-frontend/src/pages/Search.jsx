@@ -22,6 +22,7 @@ export default function Search() {
   const [error, setError] = useState('');
   const [recommendations, setRecommendations] = useState([]);
   const [trendingTopics, setTrendingTopics] = useState([]);
+  const [didYouMean, setDidYouMean] = useState(null);
   const latestRequestId = useRef(0);
   const liveRefreshTimer = useRef(null);
   const livePollCount = useRef(0);
@@ -44,6 +45,7 @@ export default function Search() {
     if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current);
     livePollCount.current = 0;
     setRefreshingLive(false);
+    setDidYouMean(null);
     if (initialQuery) {
       setQuery(initialQuery);
       fetchResults(initialQuery, 1, false);
@@ -89,6 +91,7 @@ export default function Search() {
       if (res.data.results?.recommendations && res.data.results.recommendations.length > 0) {
         setRecommendations(res.data.results.recommendations);
       }
+      setDidYouMean(res.data.didYouMean || null);
       setTotalMatches(res.data.totalMatches || 0);
       setNewsPagination(res.data.pagination?.news || { page, hasMore: false, total: nextResults.news.length });
       if (page === 1) scheduleLiveRefresh(searchQuery, res.data.discovery);
@@ -160,9 +163,26 @@ export default function Search() {
 
       {!loading && !error && initialQuery && (
         <div>
-          <p className="text-muted-foreground mb-8 text-center text-lg">
+          <p className="text-muted-foreground mb-4 text-center text-lg">
             Found <span className="font-bold text-foreground">{totalResults}</span> result(s) for "<span className="font-bold text-foreground">{initialQuery}</span>"
           </p>
+
+          {didYouMean && (
+            <div className="mb-8 mx-auto max-w-xl p-3.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center gap-2 text-sm text-center">
+              <span className="text-muted-foreground">Showing results for</span>
+              <button 
+                type="button"
+                onClick={() => {
+                  setQuery(didYouMean);
+                  navigate(`/search?q=${encodeURIComponent(didYouMean)}`);
+                }} 
+                className="font-bold text-primary hover:underline"
+              >
+                "{didYouMean}"
+              </button>
+              <span className="text-muted-foreground">instead of "{initialQuery}"</span>
+            </div>
+          )}
           
           {totalResults > 0 ? (
             <div className="space-y-12">

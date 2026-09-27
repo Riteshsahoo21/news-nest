@@ -2,7 +2,13 @@ import News from '../models/News.js';
 import LiveBlog from '../models/LiveBlog.js';
 import VideoNews from '../models/VideoNews.js';
 import PhotoGallery from '../models/PhotoGallery.js';
-import { buildSearchFilter, normalizeSearchQuery, parsePagination } from '../utils/searchQuery.js';
+import { 
+  buildSearchFilter, 
+  buildRelaxedSearchFilter,
+  findClosestQueryCorrection,
+  normalizeSearchQuery, 
+  parsePagination 
+} from '../utils/searchQuery.js';
 import { discoverSearchNews, triggerSearchNewsDiscovery } from '../services/liveDiscoveryService.js';
 
 const getSortObject = (sort, supportsPublishedAt = false) => {
@@ -21,11 +27,14 @@ const SEARCH_FIELDS = {
   photoGalleries: ['title', 'description', 'category', 'photographer', 'tags', 'photos.caption']
 };
 
-export const fetchRankedNewsPage = async ({ query, sort, skip, limit }) => {
-  const allMatches = buildSearchFilter(query, SEARCH_FIELDS.news);
-  const headlineMatches = buildSearchFilter(query, ['title', 'subtitle']);
+export const fetchRankedNewsPage = async ({ query, sort, skip, limit, isRelaxed = false }) => {
+  const filterFn = isRelaxed ? buildRelaxedSearchFilter : buildSearchFilter;
+  const allMatches = filterFn(query, SEARCH_FIELDS.news);
+  const headlineMatches = filterFn(query, ['title', 'subtitle']);
+  if (!allMatches) return { news: [], total: 0 };
+
   const newsFilter = { status: 'approved', ...allMatches };
-  const headlineFilter = { status: 'approved', ...headlineMatches };
+  const headlineFilter = { status: 'approved', ...(headlineMatches || allMatches) };
   const sortObject = getSortObject(sort, true);
 
   const [total, headlineTotal] = await Promise.all([
@@ -49,7 +58,7 @@ export const fetchRankedNewsPage = async ({ query, sort, skip, limit }) => {
     ? await News.find({
       $and: [
         newsFilter,
-        { $nor: [headlineMatches] }
+        { $nor: [headlineMatches || allMatches] }
       ]
     })
       .select('-content')
@@ -61,11 +70,12 @@ export const fetchRankedNewsPage = async ({ query, sort, skip, limit }) => {
   return { news: [...headlineNews, ...nonHeadlineNews], total };
 };
 
-// Global, literal search across every public content collection. Individual
-// terms are ANDed while each term can match any relevant field.
+// Global, intelligent search across every public content collection.
+// Includes compound phrase tolerance, typo correction, and live web discovery.
 export const globalSearch = async (req, res) => {
   try {
-    const query = normalizeSearchQuery(req.query.q);
+    const rawQuery = req.query.q;
+    const query = normalizeSearchQuery(rawQuery);
     if (!query) {
       return res.status(400).json({ error: 'Search query parameter "q" is required' });
     }
@@ -73,9 +83,12 @@ export const globalSearch = async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query, { limit: 24, maxLimit: 100 });
     const secondaryLimit = Math.min(limit, 24);
 
-    const liveBlogFilter = buildSearchFilter(query, SEARCH_FIELDS.liveBlogs);
-    const videoFilter = { status: 'approved', ...buildSearchFilter(query, SEARCH_FIELDS.videos) };
-    const galleryFilter = { status: 'approved', ...buildSearchFilter(query, SEARCH_FIELDS.photoGalleries) };
+    const correctedQuery = findClosestQueryCorrection(query);
+    let didYouMean = null;
+
+    let liveBlogFilter = buildSearchFilter(query, SEARCH_FIELDS.liveBlogs);
+    let videoFilter = { status: 'approved', ...buildSearchFilter(query, SEARCH_FIELDS.videos) };
+    let galleryFilter = { status: 'approved', ...buildSearchFilter(query, SEARCH_FIELDS.photoGalleries) };
 
     let [
       newsPage,
@@ -87,34 +100,64 @@ export const globalSearch = async (req, res) => {
       galleryTotal
     ] = await Promise.all([
       fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit }),
-      page === 1
+      page === 1 && liveBlogFilter
         ? LiveBlog.find(liveBlogFilter).sort(getSortObject(req.query.sort)).limit(secondaryLimit)
         : Promise.resolve([]),
-      page === 1
+      page === 1 && videoFilter
         ? VideoNews.find(videoFilter).sort(getSortObject(req.query.sort)).limit(secondaryLimit)
         : Promise.resolve([]),
-      page === 1
+      page === 1 && galleryFilter
         ? PhotoGallery.find(galleryFilter).sort(getSortObject(req.query.sort)).limit(secondaryLimit)
         : Promise.resolve([]),
-      LiveBlog.countDocuments(liveBlogFilter),
-      VideoNews.countDocuments(videoFilter),
-      PhotoGallery.countDocuments(galleryFilter)
+      liveBlogFilter ? LiveBlog.countDocuments(liveBlogFilter) : Promise.resolve(0),
+      videoFilter ? VideoNews.countDocuments(videoFilter) : Promise.resolve(0),
+      galleryFilter ? PhotoGallery.countDocuments(galleryFilter) : Promise.resolve(0)
     ]);
     let { news, total: newsTotal } = newsPage;
 
+    // Fallback 1: If 0 results for exact query, but a typo-corrected variant exists (e.g. 'arry minati' -> 'carry minati', 'sk rosi' -> 'skrossi')
+    if (newsTotal === 0 && correctedQuery) {
+      const correctedPage = await fetchRankedNewsPage({ query: correctedQuery, sort: req.query.sort, skip, limit });
+      if (correctedPage.total > 0) {
+        newsPage = correctedPage;
+        news = newsPage.news;
+        newsTotal = newsPage.total;
+        didYouMean = correctedQuery;
+      }
+    }
+
+    // Fallback 2: If still 0 results and multi-word query, try relaxed OR-search (e.g. 'minati' in 'arry minati')
+    if (newsTotal === 0 && query.includes(' ')) {
+      const relaxedPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit, isRelaxed: true });
+      if (relaxedPage.total > 0) {
+        newsPage = relaxedPage;
+        news = newsPage.news;
+        newsTotal = newsPage.total;
+        if (correctedQuery) didYouMean = correctedQuery;
+      }
+    }
+
+    // Fast live discovery if inventory is low (< 6 articles)
     let discovery = { attempted: false };
     const minimumSearchInventory = 6;
     if (page === 1 && newsTotal < minimumSearchInventory) {
       try {
+        const queryToDiscover = (newsTotal === 0 && correctedQuery) ? correctedQuery : query;
         // Fast live discovery with a 3.5s timeout guard so users get results immediately in ~1.5s!
         await Promise.race([
-          discoverSearchNews(query, { limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal)) }),
+          discoverSearchNews(queryToDiscover, { limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal)) }),
           new Promise((resolve) => setTimeout(resolve, 3500))
         ]);
         // Re-query database to return the newly discovered articles in this single instant response!
-        newsPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit });
-        news = newsPage.news;
-        newsTotal = newsPage.total;
+        newsPage = await fetchRankedNewsPage({ query: queryToDiscover, sort: req.query.sort, skip, limit });
+        if (newsPage.total === 0 && queryToDiscover !== query) {
+          newsPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit });
+        }
+        if (newsPage.total > 0) {
+          news = newsPage.news;
+          newsTotal = newsPage.total;
+          if (queryToDiscover !== query) didYouMean = queryToDiscover;
+        }
         discovery = { attempted: true, status: 'complete', immediate: true };
       } catch (discErr) {
         console.error('Fast live discovery search error:', discErr.message);
@@ -141,6 +184,7 @@ export const globalSearch = async (req, res) => {
 
     return res.json({
       query,
+      didYouMean,
       results: { news, liveBlogs, videos, photoGalleries, recommendations },
       totals,
       totalMatches: Object.values(totals).reduce((sum, count) => sum + count, 0),
