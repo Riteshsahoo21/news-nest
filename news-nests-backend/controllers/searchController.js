@@ -126,17 +126,6 @@ export const globalSearch = async (req, res) => {
       }
     }
 
-    // Fallback 2: If still 0 results and multi-word query, try relaxed OR-search (e.g. 'minati' in 'arry minati')
-    if (newsTotal === 0 && query.includes(' ')) {
-      const relaxedPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit, isRelaxed: true });
-      if (relaxedPage.total > 0) {
-        newsPage = relaxedPage;
-        news = newsPage.news;
-        newsTotal = newsPage.total;
-        if (correctedQuery) didYouMean = correctedQuery;
-      }
-    }
-
     // Fast live discovery if inventory is low (< 6 articles)
     let discovery = { attempted: false };
     const minimumSearchInventory = 6;
@@ -164,6 +153,17 @@ export const globalSearch = async (req, res) => {
         discovery = triggerSearchNewsDiscovery(query, {
           limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal))
         });
+      }
+    }
+
+    // Fallback 2: Only after live discovery has run, if STILL 0 results and multi-word query, try relaxed OR-search
+    if (newsTotal === 0 && query.includes(' ')) {
+      const relaxedPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit, isRelaxed: true });
+      if (relaxedPage.total > 0) {
+        newsPage = relaxedPage;
+        news = newsPage.news;
+        newsTotal = newsPage.total;
+        if (correctedQuery) didYouMean = correctedQuery;
       }
     }
 
