@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, Clock, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Clock, ShieldCheck, Newspaper, FileText } from 'lucide-react';
 import SafeImage from '../common/SafeImage';
 
 export default function EditorsPick({ articles, showSnippet = true, variant = 'grid-2' }) {
@@ -18,7 +18,7 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
   // 1. Variant: grid-2 (Editor's Pick - 2 Column Premium Editorial Spotlight)
   if (variant === 'grid-2') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full max-w-full min-w-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full max-w-full min-w-0 items-stretch">
         {articles.slice(0, 2).map((article, index) => {
           const rawImg = article.imageUrl || article.coverImage || article.thumbnail;
           const imgUrl = isUnsplash(rawImg) ? '' : rawImg;
@@ -34,7 +34,7 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
               to={getArticleLink(article)} 
               className="flex flex-col h-full rounded-xl sm:rounded-2xl border border-border/80 hover:border-red-600/50 bg-card shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group min-w-0 transform hover:-translate-y-0.5 sm:hover:-translate-y-1"
             >
-              {hasImage && (
+              {hasImage ? (
                 <div className="relative w-full aspect-[16/9] max-h-[160px] sm:max-h-none bg-muted overflow-hidden shrink-0">
                   {realMediaUrls.length > 1 ? (
                     <div className="w-full h-full flex overflow-hidden">
@@ -79,23 +79,29 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
                     {readTime} min read
                   </div>
                 </div>
+              ) : (
+                <div className="relative w-full aspect-[16/9] max-h-[160px] sm:max-h-none bg-gradient-to-br from-muted/90 via-muted/40 to-card border-b border-border/60 overflow-hidden shrink-0 p-4 flex flex-col justify-between">
+                  <Newspaper className="w-20 h-20 text-muted-foreground/10 absolute -right-3 -bottom-3 pointer-events-none transform -rotate-12 transition-transform duration-500 group-hover:scale-110 group-hover:text-muted-foreground/15" />
+                  <div className="flex items-center justify-between w-full relative z-10">
+                    <div className="bg-red-600 text-white text-[9px] sm:text-[10px] font-extrabold font-mono uppercase tracking-widest px-2.5 py-0.5 rounded-sm shadow-xs flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 shrink-0" />
+                      <span>{article.category || "EDITOR'S DESK"}</span>
+                    </div>
+                    <span className="text-[10px] sm:text-[11px] font-mono text-muted-foreground bg-background/70 backdrop-blur-xs px-2.5 py-0.5 rounded border border-border/40">
+                      {readTime} min read
+                    </span>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    <FileText className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                    <span className="font-semibold text-foreground/80">Editorial Wire Report</span>
+                    <span className="opacity-40">•</span>
+                    <span className="truncate">{article.sourceName || 'Wire Dispatch'}</span>
+                  </div>
+                </div>
               )}
 
               <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between w-full min-w-0 bg-card">
                 <div>
-                  {!hasImage && (
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-1 sm:gap-1.5 bg-red-600 text-white text-[9px] sm:text-[10px] font-extrabold font-mono uppercase tracking-widest px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-sm shadow-xs">
-                        <ShieldCheck className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{article.category || "REPORTS"}</span>
-                      </div>
-                      <div className="text-[10px] sm:text-[11px] font-mono text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-red-600" />
-                        {readTime} min read
-                      </div>
-                    </div>
-                  )}
-
                   <h4 className="font-bold font-serif text-base sm:text-lg md:text-xl lg:text-[22px] leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors text-foreground line-clamp-2 mb-2 sm:mb-2.5 break-words">
                     {article.title}
                   </h4>
@@ -106,7 +112,7 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
                   )}
                 </div>
                 
-                <div className="pt-2.5 sm:pt-3 border-t border-border/60 flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground font-sans w-full min-w-0 gap-2">
+                <div className="pt-2.5 sm:pt-3 border-t border-border/60 flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground font-sans w-full min-w-0 gap-2 mt-auto">
                   <div className="flex items-center gap-1 sm:gap-1.5 truncate min-w-0">
                     <span className="font-semibold text-foreground truncate">By {article.author || article.reporter || 'Senior Editor'}</span>
                     <span className="opacity-40 shrink-0">•</span>
@@ -130,7 +136,7 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
     : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
-    <div className={`grid ${gridColumns} gap-4 sm:gap-5 lg:gap-6 w-full max-w-full min-w-0`}>
+    <div className={`grid ${gridColumns} gap-4 sm:gap-5 lg:gap-6 w-full max-w-full min-w-0 items-stretch`}>
       {articles.map((article, index) => {
         const rawImg = article.imageUrl || article.coverImage || article.thumbnail;
         const imgUrl = isUnsplash(rawImg) ? '' : rawImg;
@@ -146,7 +152,7 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
             to={getArticleLink(article)} 
             className="flex flex-col h-full rounded-xl border border-border/80 hover:border-red-600/40 bg-card shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden group min-w-0 transform hover:-translate-y-0.5"
           >
-            {hasImage && (
+            {hasImage ? (
               <div className="relative w-full aspect-[16/9] max-h-[145px] sm:max-h-none bg-muted overflow-hidden shrink-0">
                 {realMediaUrls.length > 1 ? (
                   <div className="w-full h-full flex overflow-hidden">
@@ -190,42 +196,48 @@ export default function EditorsPick({ articles, showSnippet = true, variant = 'g
                   {readTime}m read
                 </div>
               </div>
+            ) : (
+              <div className="relative w-full aspect-[16/9] max-h-[145px] sm:max-h-none bg-gradient-to-br from-muted/90 via-muted/40 to-card border-b border-border/60 overflow-hidden shrink-0 p-3 sm:p-3.5 flex flex-col justify-between">
+                <Newspaper className="w-16 h-16 text-muted-foreground/10 absolute -right-2 -bottom-2 pointer-events-none transform -rotate-12 transition-transform duration-500 group-hover:scale-110 group-hover:text-muted-foreground/15" />
+                <div className="flex items-center justify-between w-full relative z-10">
+                  <div className="bg-red-600 text-white text-[8px] sm:text-[9px] font-extrabold font-mono uppercase tracking-widest px-2 py-0.5 rounded shadow-xs flex items-center gap-1">
+                    <ShieldCheck className="w-2.5 h-2.5 shrink-0" />
+                    <span>{article.category || 'REPORTS'}</span>
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-muted-foreground bg-background/70 backdrop-blur-xs px-2 py-0.5 rounded border border-border/40">
+                    {readTime}m read
+                  </span>
+                </div>
+                <div className="relative z-10 flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <FileText className="w-3 h-3 text-red-600 shrink-0" />
+                  <span className="font-semibold text-foreground/80">Text Wire Report</span>
+                  <span className="opacity-40">•</span>
+                  <span className="truncate">{article.sourceName || 'Wire Dispatch'}</span>
+                </div>
+              </div>
             )}
 
             <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between w-full min-w-0 bg-card">
               <div>
-                {!hasImage && (
-                  <div className="flex items-center justify-between mb-2.5">
-                    <span className="bg-red-600/10 text-red-600 dark:text-red-400 text-[10px] font-extrabold font-mono uppercase tracking-widest px-2 py-0.5 rounded border border-red-600/20">
-                      {article.category || 'REPORTS'}
-                    </span>
-                    <span className="text-[10px] sm:text-[11px] font-mono text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-red-600" />
-                      {readTime}m read
-                    </span>
-                  </div>
-                )}
-                {hasImage && (
-                  <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 mb-1.5 text-[10px] sm:text-[11px] font-mono text-muted-foreground truncate">
-                    <Clock className="w-3 h-3 text-red-600 shrink-0" />
-                    <span>Verified Wire</span>
-                    <span className="opacity-40">•</span>
-                    <span>{readTime} min read</span>
-                  </div>
-                )}
+                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 mb-1.5 text-[10px] sm:text-[11px] font-mono text-muted-foreground truncate">
+                  <Clock className="w-3 h-3 text-red-600 shrink-0" />
+                  <span>{hasImage ? 'Verified Wire' : 'Editorial Wire Dispatch'}</span>
+                  <span className="opacity-40">•</span>
+                  <span>{readTime} min read</span>
+                </div>
                 <h4 className="font-bold font-serif text-sm sm:text-base leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors text-foreground line-clamp-2 mb-1.5 sm:mb-2 break-words">
                   {article.title}
                 </h4>
                 {showSnippet && (
-                  <p className="text-xs text-muted-foreground/90 line-clamp-2 font-sans leading-relaxed mb-2.5 sm:mb-3">
-                    {(article.subtitle || article.content || 'Click to read full dispatch and field report...').slice(0, 140)}
+                  <p className="text-xs text-muted-foreground/90 line-clamp-2 sm:line-clamp-3 font-sans leading-relaxed mb-2.5 sm:mb-3">
+                    {(article.subtitle || article.content || 'Click to read full dispatch and field report...').slice(0, 150)}
                   </p>
                 )}
               </div>
               
-              <div className="pt-2 sm:pt-2.5 border-t border-border/50 flex items-center justify-between text-[10px] sm:text-[11px] font-medium text-muted-foreground font-sans w-full min-w-0 gap-1">
+              <div className="pt-2 sm:pt-2.5 border-t border-border/50 flex items-center justify-between text-[10px] sm:text-[11px] font-medium text-muted-foreground font-sans w-full min-w-0 gap-1 mt-auto">
                 <span className="font-semibold text-foreground truncate max-w-[65%]">
-                  By {article.author || article.reporter || 'News Bureau'}
+                  By {article.author || article.reporter || article.sourceName || 'News Bureau'}
                 </span>
                 <span className="shrink-0 font-mono text-[9px] sm:text-[10px] opacity-80">
                   {article.createdAt ? new Date(article.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today'}

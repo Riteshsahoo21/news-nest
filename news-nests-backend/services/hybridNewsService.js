@@ -229,58 +229,67 @@ export const syncMetadataFeeds = async (options = {}) => {
       candidates.push({ metadata: article, existing });
     }
 
-    // For live search/location discovery: Save lightweight metadata records immediately so search results appear in ~1.5s!
+    // For live search/location discovery: Save lightweight metadata records in parallel so search results appear in ~1.5s!
     if (isLiveDiscovery && candidates.length > 0) {
+      const docsToInsert = [];
       for (const { metadata: article, existing } of candidates) {
         if (!existing) {
           const objectId = new mongoose.Types.ObjectId();
           const cleanTitle = article.title.trim();
+          const cleanContent = selectRichestContent(article.content, article.summary, cleanTitle);
           const rawImg = typeof article.imageUrl === 'string' ? article.imageUrl.trim() : '';
           const isUnsplash = rawImg.includes('unsplash.com');
           const imageUrl = isUnsplash ? '' : rawImg;
-          
-          try {
-            const created = await News.create({
-              _id: objectId,
-              title: cleanTitle,
-              slug: createSlug(cleanTitle, objectId),
-              summary: article.summary || article.content || '',
-              content: cleanContent,
-              sourceUrl: article.sourceUrl,
-              sourceName: String(article.sourceName || 'Web News').trim(),
-              author: String(article.author || article.sourceName || 'News Bureau').trim(),
-              imageUrl: imageUrl,
-              mainImageUrl: imageUrl,
-              mediaUrls: imageUrl ? [imageUrl] : [],
-              category: String(article.category || 'general').toLowerCase(),
-              subCategory: String(article.subCategory || '').toLowerCase(),
-              country: String(article.country || 'all').toLowerCase(),
-              publishedAt: toValidDate(article.publishedAt) || new Date(),
-              status: 'approved',
-              isFullContentFetched: false,
-              tags: generateTags(cleanTitle, cleanContent, article.category),
-              views: Math.floor(Math.random() * 50) + 15
-            });
-            insertedCount++;
-            acceptedCount++;
-            if (created?.status === 'approved') {
-              notifyArticleApprovedInBackground(created);
-            }
-          } catch (createErr) {
-            if (createErr?.code !== 11000) {
-              console.error('Fast-insert discovery news error:', createErr.message);
-            }
-          }
+
+          docsToInsert.push({
+            _id: objectId,
+            title: cleanTitle,
+            slug: createSlug(cleanTitle, objectId),
+            summary: article.summary || article.content || '',
+            content: cleanContent,
+            sourceUrl: article.sourceUrl,
+            sourceName: String(article.sourceName || 'Web News').trim(),
+            author: String(article.author || article.sourceName || 'News Bureau').trim(),
+            imageUrl: imageUrl,
+            mainImageUrl: imageUrl,
+            mediaUrls: imageUrl ? [imageUrl] : [],
+            category: String(article.category || 'general').toLowerCase(),
+            subCategory: String(article.subCategory || '').toLowerCase(),
+            country: String(article.country || 'all').toLowerCase(),
+            publishedAt: toValidDate(article.publishedAt) || new Date(),
+            status: 'approved',
+            isFullContentFetched: false,
+            tags: generateTags(cleanTitle, cleanContent, article.category),
+            views: Math.floor(Math.random() * 50) + 15
+          });
         }
       }
-      if (insertedCount > 0) {
-        return {
-          category: category || 'all',
-          insertedCount,
-          updatedCount,
-          skippedCompleteCount,
-          acceptedCount
-        };
+
+      if (docsToInsert.length > 0) {
+        try {
+          const inserted = await News.insertMany(docsToInsert, { ordered: false });
+          insertedCount = inserted.length;
+          acceptedCount = inserted.length;
+          for (const item of inserted) {
+            if (item?.status === 'approved') {
+              notifyArticleApprovedInBackground(item);
+            }
+          }
+        } catch (insertErr) {
+          if (Array.isArray(insertErr?.insertedDocs)) {
+            insertedCount = insertErr.insertedDocs.length;
+            acceptedCount = insertErr.insertedDocs.length;
+          }
+        }
+        if (insertedCount > 0) {
+          return {
+            category: category || 'all',
+            insertedCount,
+            updatedCount,
+            skippedCompleteCount,
+            acceptedCount
+          };
+        }
       }
     }
 
