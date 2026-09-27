@@ -131,6 +131,83 @@ def _extract_team_rows(soup: BeautifulSoup) -> list[dict[str, str]]:
     return teams
 
 
+def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict[str, Any]:
+    soup = BeautifulSoup(html or "", "html.parser")
+    title = ""
+    title_el = soup.find("h1") or soup.find("title")
+    if title_el:
+        title = _clean(title_el.get_text()).replace("Cricket commentary | ", "")
+
+    status = ""
+    for d in soup.find_all("div"):
+        txt = _clean(d.get_text())
+        if any(w in txt.lower() for w in [
+            "stumps", "trail by", "lead by", "won by", "opt to bat",
+            "opt to bowl", "toss", "innings break", "lunch", "tea", "innings"
+        ]):
+            if len(txt) < 140 and not d.find("div"):
+                status = txt
+                break
+
+    team1 = {"name": "", "score": ""}
+    team2 = {"name": "", "score": ""}
+    t_match = re.search(r"(.+?)\s+(?:vs\.?|v)\s+(.+?)(?:,|-|$)", title, re.IGNORECASE)
+    if t_match:
+        team1["name"] = _clean(t_match.group(1))
+        team2["name"] = _clean(t_match.group(2))
+
+    custom_stats: list[dict[str, str]] = []
+    crr_match = re.search(r"CRR\s*[:\s]\s*(\d+(?:\.\d+)?)", html, re.IGNORECASE)
+    if crr_match:
+        custom_stats.append({"label": "Current Run Rate", "value": crr_match.group(1)})
+
+    venue_el = soup.find(text=lambda t: bool(t and "venue:" in t.lower()))
+    if venue_el and venue_el.parent:
+        v_text = _clean(venue_el.parent.get_text()).replace("Venue:", "").strip()
+        if v_text:
+            custom_stats.append({"label": "Venue", "value": v_text[:80]})
+
+    rows = soup.select("div.flex[class*='border-cbChineseSilver']")
+    updates: list[dict[str, str]] = []
+    for r in rows:
+        children = [_clean(c.get_text()) for c in r.find_all(recursive=False)]
+        if len(children) >= 2:
+            ball = children[0]
+            comm = children[1]
+            if comm:
+                label = f"Over {ball}" if re.match(r"^\d+\.\d+", ball) else (ball or "LIVE UPDATE")
+                updates.append({"title": label, "content": comm})
+        elif len(children) == 1 and len(children[0]) > 10:
+            updates.append({"title": "LIVE UPDATE", "content": children[0]})
+
+    latest_commentary = updates[0]["content"] if updates else ""
+    latest_title = updates[0]["title"] if updates else "LIVE UPDATE"
+    is_complete = any(w in f" {status.lower()} " for w in COMPLETE_WORDS)
+    update_id = hashlib.sha256(f"{external_match_id}|{status}|{latest_commentary}".encode()).hexdigest()[:24]
+
+    return {
+        "externalMatchId": external_match_id,
+        "title": title,
+        "status": status,
+        "result": status if is_complete else "",
+        "isComplete": is_complete,
+        "updateId": update_id,
+        "team1": team1,
+        "team2": team2,
+        "matchStatus": {
+            "team1": team1,
+            "team2": team2,
+            "matchInfo": status or title,
+            "customStats": custom_stats,
+        },
+        "latestCommentary": {
+            "title": latest_title,
+            "content": latest_commentary,
+        },
+        "updates": updates,
+    }
+
+
 def parse_live_score_html(html: str, external_match_id: str) -> dict[str, Any]:
     soup = BeautifulSoup(html or "", "html.parser")
     title = _first_text(soup, ["h1.cb-nav-hdr", ".cb-nav-hdr", "h1", "title"])
@@ -145,11 +222,13 @@ def parse_live_score_html(html: str, external_match_id: str) -> dict[str, Any]:
 
     commentary_nodes = soup.select(".cb-com-ln, .commtext, .commentary-text, [data-commentary]")
     latest_commentary = ""
+    updates: list[dict[str, str]] = []
     for node in reversed(commentary_nodes):
         candidate = _clean(node.get("data-commentary")) or _clean(node.get_text(" ", strip=True))
         if candidate:
-            latest_commentary = candidate
-            break
+            if not latest_commentary:
+                latest_commentary = candidate
+            updates.append({"title": "LIVE UPDATE", "content": candidate})
 
     update_basis = "|".join([
         external_match_id,
@@ -181,13 +260,11 @@ def parse_live_score_html(html: str, external_match_id: str) -> dict[str, Any]:
             "title": "LIVE UPDATE",
             "content": latest_commentary,
         },
+        "updates": updates,
     }
 
 
 async def _fetch_html(url: str) -> str:
-    # Cricbuzz currently rejects product-prefixed User-Agent strings with 403.
-    # Keep the service identity in a separate header while using a modern,
-    # standards-compatible browser UA for this publisher only.
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
         "X-News-Nests-Client": DEFAULT_USER_AGENT,
@@ -222,8 +299,19 @@ async def get_live_score(external_match_id: str):
     if not match:
         raise HTTPException(status_code=400, detail="Unsupported externalMatchId. Expected cric_<numeric-id>.")
 
+    match_id = match.group(1)
+
+    # 1. First attempt to scrape mobile commentary page (gives full ball-by-ball updates and scores)
     try:
-        match_id = match.group(1)
+        mobile_html = await _fetch_html(f"https://m.cricbuzz.com/cricket-commentary/{match_id}")
+        mobile_res = parse_mobile_live_commentary_html(mobile_html, external_match_id)
+        if mobile_res.get("updates") or mobile_res.get("status"):
+            return mobile_res
+    except Exception:
+        pass
+
+    # 2. Fallback to desktop match view
+    try:
         html = await _fetch_html(f"{CRICBUZZ_BASE_URL}/live-cricket-scores/{match_id}/match")
         result = parse_live_score_html(html, external_match_id)
         if not result["title"] and not result["status"] and not result["latestCommentary"]["content"]:

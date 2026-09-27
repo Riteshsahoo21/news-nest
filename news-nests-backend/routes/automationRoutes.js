@@ -7,6 +7,7 @@ import {
   getAutomationLiveBlogs,
   upsertLiveFixture,
   syncLiveScore,
+  seedMultiCategoryLiveBlogs,
   getNewsletterAutomationContext,
   sendAutomatedNewsletter
 } from '../controllers/automationController.js';
@@ -19,6 +20,7 @@ router.get('/news/semantic-pending', getPendingSemanticNews);
 router.put('/news/:id/semantic', updateNewsSemanticData);
 router.get('/live-blogs', getAutomationLiveBlogs);
 router.post('/live-blogs/upsert-fixture', upsertLiveFixture);
+router.post('/live-blogs/seed-multi-category', seedMultiCategoryLiveBlogs);
 router.post('/live-blogs/sync-score/:externalMatchId', syncLiveScore);
 router.get('/newsletter/context', getNewsletterAutomationContext);
 router.post('/newsletter/send', sendAutomatedNewsletter);

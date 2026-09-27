@@ -122,6 +122,31 @@ export const getAutomationLiveBlogs = async (req, res) => {
   }
 };
 
+const getThematicLiveImage = (category = 'sports', title = '') => {
+  const cat = String(category || '').toLowerCase();
+  const t = String(title || '').toLowerCase();
+
+  if (cat.includes('esport') || t.includes('cs2') || t.includes('valorant') || t.includes('fortnite') || t.includes('dota') || t.includes('gaming')) {
+    return 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80';
+  }
+  if (t.includes('cricket') || t.includes('odi') || t.includes('t20') || t.includes('test') || t.includes('wicket') || t.includes('stumps') || cat.includes('cricket')) {
+    return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80';
+  }
+  if (cat.includes('sport') || t.includes('league') || t.includes('cup') || t.includes('championship') || t.includes('match')) {
+    return 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80';
+  }
+  if (cat.includes('politic') || t.includes('election') || t.includes('parliament') || t.includes('congress') || t.includes('minister') || t.includes('court') || t.includes('government')) {
+    return 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80';
+  }
+  if (cat.includes('world') || t.includes('diplomacy') || t.includes('un ') || t.includes('treaty') || t.includes('iran') || t.includes('summit') || t.includes('crisis')) {
+    return 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?auto=format&fit=crop&w=1200&q=80';
+  }
+  if (cat.includes('tech') || t.includes('ai ') || t.includes('meta') || t.includes('google') || t.includes('apple') || t.includes('robot') || t.includes('software')) {
+    return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80';
+};
+
 export const upsertLiveFixture = async (req, res) => {
   try {
     const fixture = req.body.fixture || req.body;
@@ -135,10 +160,39 @@ export const upsertLiveFixture = async (req, res) => {
     const team2Name = cleanString(fixture.teams?.team2 || fixture.team2?.name || fixture.team2, 100);
     const venue = cleanString(fixture.venue, 200);
     const matchType = cleanString(fixture.matchType, 80);
+    const category = cleanString(fixture.category || 'sports', 40).toLowerCase();
     const description = cleanString(
-      fixture.description || `Live score, updates and commentary for ${title}${venue ? ` at ${venue}` : ''}.`,
+      fixture.description || `Live score, real-time commentary and instant bulletins for ${title}${venue ? ` at ${venue}` : ''}.`,
       1000
     );
+    const mainImageUrl = cleanString(fixture.mainImageUrl || getThematicLiveImage(category, title), 500);
+
+    const initialStats = Array.isArray(fixture.customStats) && fixture.customStats.length > 0
+      ? fixture.customStats
+      : [
+        { label: 'Format', value: matchType || 'Official Match' },
+        { label: 'Coverage', value: 'Ball-by-Ball Live' }
+      ];
+
+    const defaultPoll = fixture.poll || {
+      question: team1Name && team2Name
+        ? `Who will win the match between ${team1Name} and ${team2Name}?`
+        : `What is your prediction for ${title.slice(0, 80)}?`,
+      options: [
+        { text: team1Name || 'Option 1', votes: 14 },
+        { text: team2Name || 'Option 2', votes: 9 },
+        { text: 'Draw / Close Decider', votes: 3 }
+      ]
+    };
+
+    const initialUpdates = Array.isArray(fixture.updates) && fixture.updates.length > 0
+      ? fixture.updates
+      : [
+        {
+          title: 'LIVE COVERAGE COMMENCED',
+          content: `${title} is now streaming live on News Nests. Follow real-time commentary, live telemetry, and community discussion below.`
+        }
+      ];
 
     let liveBlog = await LiveBlog.findOne({ externalMatchId });
     let created = false;
@@ -146,24 +200,40 @@ export const upsertLiveFixture = async (req, res) => {
       liveBlog = await LiveBlog.create({
         title,
         description,
-        category: 'sports',
+        category,
         isLive: true,
-        author: 'News Nests Sports Automation',
+        author: 'News Nests Real-Time Desk',
+        mainImageUrl,
         externalMatchId,
-        tags: Array.from(new Set(['Cricket', matchType, team1Name && `${team1Name} live`, team2Name && `${team2Name} live`].filter(Boolean))),
+        tags: Array.from(new Set(['Live Coverage', category, matchType, team1Name && `${team1Name} live`, team2Name && `${team2Name} live`].filter(Boolean))),
         matchStatus: {
           team1: { name: team1Name, score: cleanString(fixture.team1?.score || 'Yet to bat', 100) },
           team2: { name: team2Name, score: cleanString(fixture.team2?.score || 'Yet to bat', 100) },
-          matchInfo: [matchType, venue].filter(Boolean).join(', '),
-          customStats: []
-        }
+          matchInfo: [matchType, venue].filter(Boolean).join(', ') || 'Live Coverage',
+          customStats: initialStats
+        },
+        poll: defaultPoll,
+        updates: initialUpdates
       });
       created = true;
     } else {
       if (!liveBlog.title) liveBlog.title = title;
       if (!liveBlog.description) liveBlog.description = description;
-      if (!liveBlog.matchStatus?.team1?.name && team1Name) liveBlog.matchStatus.team1.name = team1Name;
-      if (!liveBlog.matchStatus?.team2?.name && team2Name) liveBlog.matchStatus.team2.name = team2Name;
+      if (!liveBlog.mainImageUrl) liveBlog.mainImageUrl = mainImageUrl;
+      if (team1Name && (!liveBlog.matchStatus?.team1?.name || liveBlog.matchStatus.team1.name === '')) {
+        if (!liveBlog.matchStatus) liveBlog.matchStatus = {};
+        liveBlog.matchStatus.team1 = { name: team1Name, score: cleanString(fixture.team1?.score || 'Yet to bat', 100) };
+      }
+      if (team2Name && (!liveBlog.matchStatus?.team2?.name || liveBlog.matchStatus.team2.name === '')) {
+        if (!liveBlog.matchStatus) liveBlog.matchStatus = {};
+        liveBlog.matchStatus.team2 = { name: team2Name, score: cleanString(fixture.team2?.score || 'Yet to bat', 100) };
+      }
+      if (venue && (!liveBlog.matchStatus?.matchInfo || liveBlog.matchStatus.matchInfo === '')) {
+        liveBlog.matchStatus.matchInfo = [matchType, venue].filter(Boolean).join(', ');
+      }
+      if ((!liveBlog.poll || !liveBlog.poll.question) && defaultPoll.question) {
+        liveBlog.poll = defaultPoll;
+      }
       await liveBlog.save();
     }
 
@@ -214,7 +284,7 @@ export const syncLiveScore = async (req, res) => {
           score: cleanString(incomingMatchStatus.team2?.score || liveBlog.matchStatus?.team2?.score, 100)
         },
         matchInfo: cleanString(incomingMatchStatus.matchInfo || liveBlog.matchStatus?.matchInfo, 300),
-        customStats: Array.isArray(incomingMatchStatus.customStats)
+        customStats: Array.isArray(incomingMatchStatus.customStats) && incomingMatchStatus.customStats.length > 0
           ? incomingMatchStatus.customStats.slice(0, 20).map((stat) => ({
             label: cleanString(stat.label, 80),
             value: cleanString(stat.value, 120)
@@ -224,14 +294,24 @@ export const syncLiveScore = async (req, res) => {
     }
 
     let appendedUpdate = false;
-    if (updateContent && (!updateId || updateId !== liveBlog.lastExternalUpdateId)) {
-      const alreadyPresent = liveBlog.updates.some((update) => update.content === updateContent);
-      if (!alreadyPresent) {
-        liveBlog.updates.push({ title: updateTitle, content: updateContent });
+    const incomingUpdates = Array.isArray(score.updates) && score.updates.length > 0
+      ? score.updates
+      : (updateContent ? [{ title: updateTitle, content: updateContent }] : []);
+
+    for (const item of incomingUpdates) {
+      const content = cleanString(item.content || item, 4000);
+      const title = cleanString(item.title || 'LIVE UPDATE', 200);
+      if (content && !liveBlog.updates.some((u) => u.content === content)) {
+        liveBlog.updates.push({
+          title,
+          content,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+        });
         appendedUpdate = true;
       }
-      if (updateId) liveBlog.lastExternalUpdateId = updateId;
     }
+
+    if (updateId) liveBlog.lastExternalUpdateId = updateId;
 
     const isComplete = toBoolean(score.isComplete || score.matchComplete);
     if (isComplete && liveBlog.isLive) {
@@ -248,6 +328,170 @@ export const syncLiveScore = async (req, res) => {
   } catch (error) {
     console.error('Error syncing automated live score:', error);
     res.status(500).json({ error: 'Unable to sync live score.' });
+  }
+};
+
+export const seedMultiCategoryLiveBlogs = async (req, res) => {
+  try {
+    const multiCategorySeeds = [
+      {
+        externalMatchId: 'esports_starseries_fall_2026',
+        title: 'Grand Finals Live: Team Vitality vs Aurora Gaming - CS2 StarSeries Fall 2026',
+        description: 'Comprehensive round-by-round commentary, tactical utility analytics, and economy telemetry from the CS2 StarSeries Fall 2026 Grand Final showdown.',
+        category: 'esports',
+        mainImageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
+        author: 'News Nests Esports Desk',
+        matchStatus: {
+          team1: { name: 'Team Vitality', score: '2' },
+          team2: { name: 'Aurora Gaming', score: '1' },
+          matchInfo: 'Grand Final (BO5) • Map 4: Inferno (Live 11-9)',
+          customStats: [
+            { label: 'Tournament', value: 'StarSeries Fall 2026' },
+            { label: 'Prize Pool', value: '$500,000 USD' },
+            { label: 'Map 1 (Nuke)', value: '13-8 (Vitality)' },
+            { label: 'Map 2 (Mirage)', value: '11-13 (Aurora)' },
+            { label: 'Map 3 (Anubis)', value: '13-10 (Vitality)' },
+            { label: 'Current Map', value: 'Inferno (Vitality 11 - 9 Aurora)' }
+          ]
+        },
+        poll: {
+          question: 'Can Aurora Gaming force a deciding Map 5 on Train?',
+          options: [
+            { text: 'Yes, Aurora will mount the comeback', votes: 47 },
+            { text: 'No, Vitality will close out the championship', votes: 122 }
+          ]
+        },
+        updates: [
+          {
+            title: 'Round 20: ZywOo 1v2 Clutch on B Site!',
+            content: 'Vitality 11 - 9 Aurora. With the bomb planted on B Site, ZywOo finds two crisp AWP frags through smoke to secure match point buffer for Vitality!'
+          },
+          {
+            title: 'Round 19: Aurora Answers with Fast Banana Push',
+            content: 'Vitality 10 - 9 Aurora. deko and KENSI open Banana with double HE grenades, overwhelming Vitality defenders and winning the round with zero casualties.'
+          },
+          {
+            title: 'Halftime Switch: Vitality 9 - 6 Aurora',
+            content: 'Vitality concludes a dominant Counter-Terrorist half on Inferno. Apex orchestrates high-pressure middle control to shut down Aurora default executes.'
+          },
+          {
+            title: 'Pistol Round: Vitality takes CT opener',
+            content: 'FlameZ secures a triple-kill with dualies in Apartments to kick off Map 4 for Team Vitality.'
+          }
+        ]
+      },
+      {
+        externalMatchId: 'politics_hormuz_un_summit_2026',
+        title: 'Global Geopolitics Live: Geneva Emergency Talks on Strait of Hormuz Navigation & Oil Security',
+        description: 'Instant bulletins and diplomatic analysis as US, European, Iranian, and Gulf representatives hold high-stakes emergency negotiations on Persian Gulf maritime corridors.',
+        category: 'politics',
+        mainImageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80',
+        author: 'Global Affairs Newsroom',
+        matchStatus: {
+          team1: { name: 'Western Coalition', score: 'Draft Communique 4' },
+          team2: { name: 'Regional Mediators', score: 'Oman Protocol B' },
+          matchInfo: 'Geneva Peace Palace • Ministerial Emergency Session',
+          customStats: [
+            { label: 'Host & Mediator', value: 'Switzerland & Oman' },
+            { label: 'Core Transit Zone', value: 'Strait of Hormuz' },
+            { label: 'Oil Market Impact', value: 'Brent Crude $86.40/bbl' },
+            { label: 'Delegation Status', value: 'Minister-level closed consultations' }
+          ]
+        },
+        poll: {
+          question: 'Will international diplomatic mediation produce a binding maritime transit agreement?',
+          options: [
+            { text: 'Yes, both sides face intense economic pressure', votes: 89 },
+            { text: 'No, fundamental disagreements remain unresolved', votes: 71 }
+          ]
+        },
+        updates: [
+          {
+            title: '17:15 GMT: European Mediators Present 5-Point De-escalation Memo',
+            content: 'European Union foreign policy representatives have formally tabled a 5-point proposal providing commercial ship escorts alongside monitored maritime corridors.'
+          },
+          {
+            title: '16:30 GMT: Iranian Foreign Ministry Signals Willingness for Technical Talks',
+            content: 'Tehran foreign ministry spokespersons confirm participation in technical maritime security working groups while maintaining sovereign territorial waters claims.'
+          },
+          {
+            title: '15:00 GMT: Joint Plenary Session Convenes in Geneva',
+            content: 'Delegates from 14 nations enter the main assembly chamber under strict diplomatic protocol to discuss international shipping insurance and energy transit guarantees.'
+          }
+        ]
+      },
+      {
+        externalMatchId: 'tech_meta_muse_agent_keynote_2026',
+        title: 'AI Economy Keynote Live: Meta Launches Autonomous Agent "Muse" & Subscription Management Engine',
+        description: 'Real-time announcements, technical architecture breakdowns, and Wall Street financial impact analysis as Meta introduces agentic AI assistant Muse.',
+        category: 'technology',
+        mainImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+        author: 'Silicon Valley Technology Desk',
+        matchStatus: {
+          team1: { name: 'Agent Capabilities', score: '100% Autonomous' },
+          team2: { name: 'Platform Rollout', score: 'Phase 1 Beta' },
+          matchInfo: 'Meta Global Keynote • Menlo Park, California',
+          customStats: [
+            { label: 'Featured Speaker', value: 'Mark Zuckerberg' },
+            { label: 'Core Architecture', value: 'Llama 4 Multi-Agentic Engine' },
+            { label: 'Target Disruption', value: 'Subscription Economy & Auto-Audits' },
+            { label: 'Developer SDK', value: 'Live on GitHub & Cloud APIs' }
+          ]
+        },
+        poll: {
+          question: 'Will autonomous AI agents replace human management of subscriptions and recurring bills?',
+          options: [
+            { text: 'Yes, agents will automate daily finances completely', votes: 156 },
+            { text: 'No, consumers will insist on manual verification', votes: 41 }
+          ]
+        },
+        updates: [
+          {
+            title: 'Demo: Muse Cancels Inactive Streaming Subscription in 3 Seconds',
+            content: 'On stage, Zuckerberg demonstrates Muse identifying a forgotten recurring $18/month gym subscription, navigating the cancellation flow, and depositing savings into a high-yield account.'
+          },
+          {
+            title: 'Security Architecture: Encrypted Local Enclaves Announced',
+            content: 'Meta Chief AI Scientist details the cryptographic sandboxing that prevents personal agents from exposing banking credentials to third-party services.'
+          },
+          {
+            title: 'Keynote Starts: Zuckerberg Outlines Post-App Internet Strategy',
+            content: 'Mark Zuckerberg takes the stage in Menlo Park, declaring agentic AI personal assistants as the central computing interface of the next decade.'
+          }
+        ]
+      }
+    ];
+
+    const results = [];
+    for (const seed of multiCategorySeeds) {
+      let liveBlog = await LiveBlog.findOne({ externalMatchId: seed.externalMatchId });
+      if (!liveBlog) {
+        liveBlog = await LiveBlog.create({
+          ...seed,
+          isLive: true,
+          tags: [seed.category, 'Live Coverage', 'Breaking']
+        });
+      } else {
+        liveBlog.title = seed.title;
+        liveBlog.description = seed.description;
+        liveBlog.category = seed.category;
+        liveBlog.isLive = true;
+        liveBlog.mainImageUrl = seed.mainImageUrl;
+        liveBlog.matchStatus = seed.matchStatus;
+        liveBlog.poll = seed.poll;
+        if (!liveBlog.updates || liveBlog.updates.length === 0) {
+          liveBlog.updates = seed.updates;
+        }
+        liveBlog.updatedAt = new Date();
+        await liveBlog.save();
+      }
+      results.push(liveBlog);
+    }
+
+    res.json({ message: 'Multi-category live coverage seeded successfully', count: results.length, liveBlogs: results });
+  } catch (error) {
+    console.error('Error seeding multi-category live blogs:', error);
+    res.status(500).json({ error: 'Unable to seed multi-category live blogs.' });
   }
 };
 
