@@ -2,6 +2,8 @@ import redisClient from '../config/redis.js';
 
 const cacheMiddleware = (duration) => {
   return async (req, res, next) => {
+    if (!redisClient) return next();
+
     // Generate a unique cache key based on the request URL and query params
     const key = `cache:${req.originalUrl || req.url}`;
 

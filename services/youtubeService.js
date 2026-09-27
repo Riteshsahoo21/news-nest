@@ -1,5 +1,6 @@
 import axios from 'axios';
 import VideoNews from '../models/VideoNews.js';
+import { generateTags } from '../utils/tagGenerator.js';
 
 const decodeHtmlEntities = (text) => {
   if (!text) return '';
@@ -270,9 +271,12 @@ export const fetchAndSaveYouTubeNews = async () => {
         featuredAssigned = true;
       }
 
+      const cleanDesc = decodeHtmlEntities(cleanDescription(descriptionMap[videoId] || snippet.description || snippet.title));
+      const autoTags = generateTags(snippet.title, cleanDesc, mappedCategory);
+
       const videoData = {
         title: decodeHtmlEntities(snippet.title),
-        description: decodeHtmlEntities(cleanDescription(descriptionMap[videoId] || snippet.description || snippet.title)),
+        description: cleanDesc,
         videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
         thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',
         category: mappedCategory,
@@ -280,6 +284,7 @@ export const fetchAndSaveYouTubeNews = async () => {
         duration: durationMap[videoId] || '02:00',
         views: 0,
         isShort,
+        tags: autoTags,
         isFeatured
       };
 
@@ -423,9 +428,12 @@ export const fetchAndSaveCategoryVideos = async (category) => {
         continue;
       }
 
+      const cleanDesc = decodeHtmlEntities(cleanDescription(descriptionMap[videoId] || snippet.description || snippet.title));
+      const autoTags = generateTags(snippet.title, cleanDesc, catName);
+
       const videoData = {
         title: decodeHtmlEntities(snippet.title),
-        description: decodeHtmlEntities(cleanDescription(descriptionMap[videoId] || snippet.description || snippet.title)),
+        description: cleanDesc,
         videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
         thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',
         category: catName,
@@ -433,6 +441,7 @@ export const fetchAndSaveCategoryVideos = async (category) => {
         duration: durationStr,
         views: 0,
         isShort,
+        tags: autoTags,
         isFeatured: false
       };
 

@@ -9,21 +9,10 @@ export const getMe = async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    let daysRemaining = null;
-    if (user.isPremium && user.subscriptionExpiry) {
-      const expiry = new Date(user.subscriptionExpiry);
-      const now = new Date(); // Secure Backend Clock
-      const diffTime = expiry - now;
-      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (daysRemaining < 0) daysRemaining = 0;
-    }
-    
     res.json({
       ...user.toObject(),
       allowedCategories: req.user.allowedCategories,
       permissions: req.user.permissions || [],
-      daysRemaining,
-      cancelAtPeriodEnd: user.cancelAtPeriodEnd || false,
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -164,8 +153,7 @@ export const updateProfile = async (req, res) => {
         profilePicture: user.profilePicture,
         socialLinks: user.socialLinks,
         roles: user.roles || (user.role ? [user.role] : []),
-        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
-        isPremium: user.isPremium
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role
       }
     });
   } catch (error) {
@@ -176,7 +164,10 @@ export const updateProfile = async (req, res) => {
 
 export const getPublicProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isObjectId ? { _id: req.params.id } : { username: req.params.id };
+
+    const user = await User.findOne(query)
       .populate('followers', 'fullName profilePicture')
       .populate('following', 'fullName profilePicture');
       
@@ -185,7 +176,7 @@ export const getPublicProfile = async (req, res) => {
     // Only return safe public information
     res.json({
       _id: user._id,
-      fullName: user.fullName,
+      fullName: user.fullName || (user.email ? user.email.split('@')[0] : 'User'),
       username: user.username,
       bio: user.bio,
       location: user.location,
@@ -193,8 +184,7 @@ export const getPublicProfile = async (req, res) => {
       socialLinks: user.socialLinks,
       roles: user.roles || (user.role ? [user.role] : []),
       role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
-      isPremium: user.isPremium,
-      createdAt: user.createdAt,
+      createdAt: user.createdAt || user._id.getTimestamp(),
       followersCount: user.followers ? user.followers.length : 0,
       followingCount: user.following ? user.following.length : 0,
       followers: user.followers || [], 

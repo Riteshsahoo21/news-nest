@@ -11,7 +11,8 @@ import {
   approveGallery,
   rejectGallery,
   likeGallery,
-  addComment
+  addComment,
+  getRelatedGalleries
 } from '../controllers/photoGalleryController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import { commentLimiter } from '../middleware/rateLimiters.js';
@@ -29,6 +30,8 @@ router.get('/my-submissions', verifyToken, authorizePermissions('create_content'
 
 router.put('/:id/approve', verifyToken, authorizePermissions('approve_content'), approveGallery);
 router.put('/:id/reject', verifyToken, authorizePermissions('approve_content'), rejectGallery);
+
+router.get('/related', getRelatedGalleries);
 
 // Public route for single gallery
 router.get('/:id', getGalleryById);

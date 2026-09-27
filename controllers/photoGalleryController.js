@@ -44,7 +44,7 @@ export const getGalleryById = async (req, res) => {
 // Create a new photo gallery (Admin/Editor/Reporter)
 export const createGallery = async (req, res) => {
   try {
-    const { title, description, category, photographer, relatedNews } = req.body;
+    const { title, description, category, photographer, relatedNews, tags } = req.body;
 
     let photos = [];
     if (req.files && req.files.length > 0) {
@@ -70,6 +70,7 @@ export const createGallery = async (req, res) => {
       photographer,
       photos,
       relatedNews,
+      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []),
       authorId: req.user ? req.user.id : null,
       status: canAutoApprove ? 'approved' : 'pending' // auto-approve if they have content management permissions
     });
@@ -159,17 +160,90 @@ export const rejectGallery = async (req, res) => {
 
     res.json(gallery);
   } catch (error) {
-    console.error('Error rejecting gallery:', error);
+    console.error('Error fetching gallery stats:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Get related photo galleries
+export const getRelatedGalleries = async (req, res) => {
+  try {
+    const { galleryId, tags, category } = req.query;
+    
+    let queryTags = [];
+    if (tags) {
+      queryTags = (Array.isArray(tags) ? tags : tags.split(',')).map(t => t.trim()).filter(Boolean);
+    }
+
+    // Build the query to find related galleries
+    let filter = { status: 'approved' };
+    
+    // Exclude the current gallery if provided
+    if (galleryId) {
+      filter._id = { $ne: galleryId };
+    }
+
+    // Match by tags (highest priority) or category
+    if (queryTags.length > 0) {
+      filter.tags = { $in: queryTags };
+    } else if (category) {
+      filter.category = category.toLowerCase();
+    }
+
+    // Fetch related galleries
+    let relatedGalleries = await PhotoGallery.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .select('title slug coverImage photos createdAt');
+    
+    // Map to normalized structure (assuming coverImage or first photo is needed)
+    relatedGalleries = relatedGalleries.map(g => ({
+      _id: g._id,
+      title: g.title,
+      slug: g.slug,
+      imageUrl: g.coverImage || (g.photos && g.photos.length > 0 ? g.photos[0].url : ''),
+      createdAt: g.createdAt
+    }));
+    
+    // If not enough related galleries by tags, fallback to category
+    if (relatedGalleries.length < 3 && category && queryTags.length > 0) {
+      const excludeIds = relatedGalleries.map(n => n._id);
+      if (galleryId) excludeIds.push(galleryId);
+      
+      const moreGalleries = await PhotoGallery.find({
+        _id: { $nin: excludeIds },
+        status: 'approved',
+        category: category.toLowerCase()
+      }).sort({ createdAt: -1 }).limit(3 - relatedGalleries.length).select('title slug coverImage photos createdAt');
+      
+      const mappedMore = moreGalleries.map(g => ({
+        _id: g._id,
+        title: g.title,
+        slug: g.slug,
+        imageUrl: g.coverImage || (g.photos && g.photos.length > 0 ? g.photos[0].url : ''),
+        createdAt: g.createdAt
+      }));
+      
+      relatedGalleries = [...relatedGalleries, ...mappedMore];
+    }
+    
+    res.json(relatedGalleries);
+  } catch (error) {
+    console.error('Error fetching related photo galleries:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 
 // Update a photo gallery (Admin only)
 export const updateGallery = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-
+    if (updates.tags !== undefined && !Array.isArray(updates.tags)) {
+      updates.tags = updates.tags ? updates.tags.split(',').map(t => t.trim()) : [];
+    }
+    
     const updatedGallery = await PhotoGallery.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
 
     if (!updatedGallery) {

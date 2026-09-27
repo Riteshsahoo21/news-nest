@@ -69,7 +69,26 @@ const videoNewsSchema = new mongoose.Schema(
       type: String,
       enum: ['all', 'staff_only', 'off'],
       default: 'all',
-    }
+    },
+    authorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+      }
+    ]
   },
   { timestamps: true }
 );

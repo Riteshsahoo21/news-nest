@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import News from '../models/News.js';
 import * as cheerio from 'cheerio';
 import { createSlug } from '../utils/slugify.js';
+import { generateTags } from '../utils/tagGenerator.js';
 
 const VALID_CATEGORIES = ['world', 'politics', 'sports', 'technology', 'business', 'entertainment', 'health', 'science', 'lifestyle'];
 
@@ -242,6 +243,8 @@ export const fetchAndSaveCurrentsNews = async () => {
               authorToSave = `${category.charAt(0).toUpperCase() + category.slice(1)} Editorial Desk`;
             }
 
+            const autoTags = generateTags(cleanTitle, finalContent, category);
+
             const newsData = {
               title: cleanTitle,
               slug: createSlug(cleanTitle, new mongoose.Types.ObjectId()),
@@ -252,6 +255,7 @@ export const fetchAndSaveCurrentsNews = async () => {
               status: 'approved',
               isEditorPick: false,
               isTrending: true, 
+              tags: autoTags,
               readTime: Math.max(1, Math.ceil((finalContent?.length || 500) / 1000)),
               views: Math.floor(Math.random() * 400) + 50,
             };

@@ -1,13 +1,17 @@
 import cron from 'node-cron';
-import { fetchAndSaveCurrentsNews } from '../services/currentsService.js';
+import { syncHarmonizedNews } from '../services/unifiedNewsAggregator.js';
 import { fetchAndSaveYouTubeNews, fetchAndSaveCategoryVideos, balanceAllCategoryCounts } from '../services/youtubeService.js';
 import News from '../models/News.js';
 
-// Schedule Currents API to run every hour
+// Schedule Unified Hybrid News Sync to run every hour
 export const initCronJobs = () => {
   cron.schedule('0 * * * *', async () => {
-    console.log('Running scheduled news fetch job from Currents API...');
-    await fetchAndSaveCurrentsNews();
+    console.log('Running scheduled news sync (GNews + Scraper hybrid)...');
+    try {
+      await syncHarmonizedNews(8);
+    } catch (err) {
+      console.warn('Scheduled news sync error:', err.message);
+    }
   });
 
   // Schedule YouTube API to run every 6 hours to respect the 100 requests/day limit safely
@@ -50,9 +54,13 @@ export const initCronJobs = () => {
     }
   });
 
-  // Run it immediately on startup (Currents API ONLY)
-  // We DO NOT run YouTube API on startup to prevent nodemon restarts from burning the 100 searches/day quota.
+  // Run initial news sync on startup
   setTimeout(async () => {
-    fetchAndSaveCurrentsNews();
+    try {
+      console.log('Running startup news sync (GNews / Scraper)...');
+      await syncHarmonizedNews(8);
+    } catch (e) {
+      console.warn('Startup news sync failed:', e.message);
+    }
   }, 5000); 
 };

@@ -13,6 +13,16 @@ const subscriberSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    subscriptions: {
+      type: [String],
+      default: ['daily_briefing', 'breaking_news', 'market_watch'],
+    },
+    bindedUserEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

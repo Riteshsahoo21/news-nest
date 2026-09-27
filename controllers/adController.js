@@ -1,4 +1,5 @@
 import Advertisement from '../models/Advertisement.js';
+import { trackUniqueView } from '../utils/viewTracker.js';
 
 // ADMIN ENDPOINTS
 
@@ -96,20 +97,17 @@ export const getRandomAd = async (req, res) => {
   }
 };
 
-// Increment view count (Unique by IP)
+// Increment view count (Unique via ViewTracker)
 export const trackView = async (req, res) => {
   try {
     const { id } = req.params;
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
-    await Advertisement.findOneAndUpdate(
-      { _id: id, viewedByIPs: { $ne: clientIp } }, // Only match if IP is not in array
-      { 
-        $inc: { views: 1 },
-        $push: { viewedByIPs: clientIp }
-      }
-    );
-    res.json({ success: true });
+    
+    const isUnique = await trackUniqueView(req, id, 'Advertisement');
+    if (isUnique) {
+      await Advertisement.findByIdAndUpdate(id, { $inc: { views: 1 } });
+    }
+    
+    res.json({ success: true, unique: isUnique });
   } catch (error) {
     // Fail silently for tracking routes
     res.status(500).json({ error: 'Failed to track view' });

@@ -4,8 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "news:audit": "node scripts/auditScrapedNews.js",
+    "news:ensure-indexes": "node scripts/ensureNewsIndexes.js",
+    "news:sync-category": "node scripts/syncScrapedCategory.js",
+    "news:reset-and-refill": "node scripts/resetAndRefillNews.js",
+    "news:verify-live": "node scripts/verifyLiveDiscovery.js",
+    "news:verify-region": "node scripts/verifyRegionalDiscovery.js"
   },
   "keywords": [],
   "author": "",

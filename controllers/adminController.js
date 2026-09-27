@@ -98,14 +98,82 @@ export const getDashboardStats = async (req, res) => {
 
 export const getAuditLogStats = async (req, res) => {
   try {
-    const total = await AuditLog.countDocuments();
-    const successful = await AuditLog.countDocuments({ status: { $lt: 400 } });
-    const failed = await AuditLog.countDocuments({ status: { $gte: 400, $lt: 500 } });
-    const critical = await AuditLog.countDocuments({ severity: 'critical' });
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const total = await AuditLog.countDocuments();
     const todayCount = await AuditLog.countDocuments({ createdAt: { $gte: today } });
+
+    // Growth & Revenue
+    const newRegistrations = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Users & Access', 
+      $or: [{ action: { $regex: /register/i } }, { action: { $regex: /create/i } }] 
+    });
+    
+    const subscriptionUpgrades = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Monetization',
+      $or: [{ action: { $regex: /subscribe/i } }, { action: { $regex: /upgrade/i } }] 
+    });
+
+    const paymentSuccess = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Monetization', 
+      status: { $lt: 400 } 
+    });
+
+    const paymentFailed = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Monetization', 
+      status: { $gte: 400 } 
+    });
+
+    // Content & Community
+    const contentPublished = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Content', 
+      $or: [{ action: { $regex: /publish/i } }, { action: { $regex: /create/i } }, { action: { $regex: /add/i } }],
+      status: { $lt: 400 } 
+    });
+
+    const contentDeleted = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Content', 
+      action: { $regex: /delete/i } 
+    });
+
+    const commentsModerated = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Community', 
+      $or: [{ action: { $regex: /comment/i } }, { action: { $regex: /approve/i } }, { action: { $regex: /reject/i } }] 
+    });
+
+    // Security & Access
+    const successfulLogins = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Authentication', 
+      action: { $regex: /login/i },
+      status: { $lt: 400 } 
+    });
+
+    const failedLogins = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Authentication', 
+      action: { $regex: /login/i },
+      status: { $gte: 400 } 
+    });
+
+    const roleChanges = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      moduleCategory: 'Users & Access', 
+      action: { $regex: /role/i } 
+    });
+
+    const securityAlerts = await AuditLog.countDocuments({ 
+      createdAt: { $gte: today }, 
+      severity: 'critical' 
+    });
 
     const categoryAggregation = await AuditLog.aggregate([
       { $group: { _id: '$moduleCategory', count: { $sum: 1 } } }
@@ -119,11 +187,21 @@ export const getAuditLogStats = async (req, res) => {
       success: true,
       data: {
         total,
-        successful,
-        failed,
-        critical,
         todayCount,
-        byCategory
+        byCategory,
+        metrics: {
+          newRegistrations,
+          subscriptionUpgrades,
+          paymentSuccess,
+          paymentFailed,
+          contentPublished,
+          contentDeleted,
+          commentsModerated,
+          successfulLogins,
+          failedLogins,
+          roleChanges,
+          securityAlerts
+        }
       }
     });
   } catch (error) {

@@ -2,6 +2,9 @@ import express from 'express';
 import { 
   subscribe, 
   unsubscribe, 
+  checkStatus,
+  updatePreferences,
+  getBindedAccounts,
   getSubscribers, 
   deleteSubscriber, 
   getCampaigns, 
@@ -14,7 +17,11 @@ const router = express.Router();
 
 // Public Routes
 router.post('/subscribe', newsletterLimiter, subscribe);
-router.get('/unsubscribe', unsubscribe); // GET for easy email link clicking
+router.get('/unsubscribe', unsubscribe);
+router.post('/unsubscribe', unsubscribe);
+router.get('/status/:email', checkStatus);
+router.get('/binded/:userEmail', getBindedAccounts);
+router.put('/preferences', updatePreferences);
 
 // Admin Routes
 router.get('/subscribers', verifyToken, authorizePermissions('manage_users'), getSubscribers);

@@ -20,10 +20,6 @@ export const applyForReporter = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!user.isPremium) {
-      return res.status(403).json({ error: 'Only Premium members can apply for the Reporter role' });
-    }
-
     if (user.roles.includes('reporter')) {
       return res.status(400).json({ error: 'You are already a reporter' });
     }
@@ -68,7 +64,7 @@ export const getMyApplication = async (req, res) => {
 // Admin gets all applications
 export const getAllApplications = async (req, res) => {
   try {
-    const applications = await ReporterApplication.find().populate('userId', 'fullName email isPremium roles').sort({ createdAt: -1 });
+    const applications = await ReporterApplication.find().populate('userId', 'fullName email roles').sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
     console.error('Error getting all applications:', error);

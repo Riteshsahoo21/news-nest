@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, googleSignIn, logout } from '../controllers/authController.js';
+import { register, login, googleSignIn, logout, sendRegistrationOTP } from '../controllers/authController.js';
 import rateLimit from 'express-rate-limit';
 
 const authLimiter = (req, res, next) => next();
@@ -13,6 +13,7 @@ const authLimiter = (req, res, next) => next();
 
 const router = express.Router();
 
+router.post('/send-otp', authLimiter, sendRegistrationOTP);
 router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 router.post('/google', googleSignIn);

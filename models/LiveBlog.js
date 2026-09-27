@@ -127,6 +127,23 @@ const liveBlogSchema = new mongoose.Schema(
         ref: 'User',
       }
     ],
+    tags: [
+      {
+        type: String,
+        trim: true,
+      }
+    ],
+    // Stable provider identifier used by the n8n live-sports automations.
+    externalMatchId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    lastExternalUpdateId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     // --- Advanced SEO Overrides & Semantic Slug ---
     slug: {
       type: String,
@@ -148,7 +165,11 @@ liveBlogSchema.pre('save', function() {
   }
 });
 
+liveBlogSchema.index(
+  { externalMatchId: 1 },
+  { unique: true, partialFilterExpression: { externalMatchId: { $type: 'string', $gt: '' } } }
+);
+
 const LiveBlog = mongoose.model('LiveBlog', liveBlogSchema);
 export default LiveBlog;
-
 

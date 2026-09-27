@@ -67,7 +67,13 @@ const photoGallerySchema = new mongoose.Schema(
       type: String,
       enum: ['all', 'staff_only', 'off'],
       default: 'all',
-    }
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+      }
+    ]
   },
   { timestamps: true }
 );

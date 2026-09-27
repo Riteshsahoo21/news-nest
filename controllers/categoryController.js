@@ -3,7 +3,12 @@ import Category from '../models/Category.js';
 // Get all active categories (Public)
 export const getActiveCategories = async (req, res) => {
   try {
-    const categories = await Category.find({ isActive: true }).sort({ name: 1 });
+    const query = { isActive: true };
+    if (req.query.type) {
+      // If a specific type is requested (e.g. ?type=article), only fetch categories that support it
+      query.contentTypes = req.query.type;
+    }
+    const categories = await Category.find(query).sort({ name: 1 });
     res.json(categories);
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -25,13 +30,18 @@ export const getAllCategoriesAdmin = async (req, res) => {
 // Create a new category (Admin)
 export const createCategory = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, contentTypes } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Category name is required' });
     }
 
-    const category = await Category.create({ name, description });
+    const payload = { name, description };
+    if (contentTypes && Array.isArray(contentTypes)) {
+      payload.contentTypes = contentTypes;
+    }
+
+    const category = await Category.create(payload);
     res.status(201).json({ message: 'Category created successfully', category });
   } catch (error) {
     console.error('Error creating category:', error);
@@ -46,11 +56,16 @@ export const createCategory = async (req, res) => {
 export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, isActive } = req.body;
+    const { name, description, isActive, contentTypes } = req.body;
+
+    const payload = { name, description, isActive };
+    if (contentTypes && Array.isArray(contentTypes)) {
+      payload.contentTypes = contentTypes;
+    }
 
     const category = await Category.findByIdAndUpdate(
       id,
-      { name, description, isActive },
+      payload,
       { new: true, runValidators: true }
     );
 

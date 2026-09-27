@@ -43,19 +43,7 @@ export const updateUserRole = async (req, res) => {
       return res.status(400).json({ error: 'At least one role must be provided' });
     }
     
-    // Handle pseudo-role for 'Registered Premium'
-    let isPremium = undefined;
     let roles = [...requestedRoles];
-    
-    if (roles.includes('registered_premium')) {
-      roles = ['registered_user'];
-      isPremium = true;
-    } else if (roles.includes('reporter_premium')) {
-      roles = ['reporter'];
-      isPremium = true;
-    } else if (roles.includes('registered_user') || roles.includes('reporter')) {
-      isPremium = false; // Revoke premium if explicitly set back to non-premium role
-    }
     
     // Validate roles dynamically
     const validRoleDocs = await Role.find({ name: { $in: roles } });
@@ -73,14 +61,11 @@ export const updateUserRole = async (req, res) => {
     
     // Construct update payload
     const updatePayload = { roles, role: roles[0] };
-    if (isPremium !== undefined) {
-      updatePayload.isPremium = isPremium;
-    }
 
     // Use findByIdAndUpdate to bypass validation of other fields (like missing fullName in legacy records)
     await User.findByIdAndUpdate(id, updatePayload, { runValidators: false });
     
-    res.json({ message: 'User roles updated successfully', user: { id: targetUser._id, roles, isPremium } });
+    res.json({ message: 'User roles updated successfully', user: { id: targetUser._id, roles } });
   } catch (error) {
     console.error('Error updating user role:', error);
     res.status(500).json({ error: 'Internal server error' });

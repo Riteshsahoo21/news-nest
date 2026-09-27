@@ -96,7 +96,7 @@ export const createLiveBlog = async (req, res) => {
       return res.status(403).json({ error: 'Access denied: You do not have Live Blog management permissions. Contact an admin.' });
     }
 
-    const { title, description, category, author, mainImageUrl, matchStatus, poll, mediaGallery, streamType, streamUrl, isStreamActive } = req.body;
+    const { title, description, category, author, mainImageUrl, matchStatus, poll, mediaGallery, streamType, streamUrl, isStreamActive, tags } = req.body;
 
     if (!title || !description || !category) {
       return res.status(400).json({ error: 'Please provide title, description, and category' });
@@ -144,7 +144,7 @@ export const updateLiveBlog = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { title, description, category, isLive, mainImageUrl, matchStatus, poll, streamType, streamUrl, isStreamActive } = req.body;
+    const { title, description, category, isLive, mainImageUrl, matchStatus, poll, streamType, streamUrl, isStreamActive, tags } = req.body;
 
     const liveBlog = await LiveBlog.findById(id);
     if (!liveBlog) {
@@ -158,6 +158,9 @@ export const updateLiveBlog = async (req, res) => {
     if (streamType !== undefined) liveBlog.streamType = streamType;
     if (streamUrl !== undefined) liveBlog.streamUrl = streamUrl;
     if (isStreamActive !== undefined) liveBlog.isStreamActive = isStreamActive;
+    if (tags !== undefined) {
+      liveBlog.tags = Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []);
+    }
     if (mainImageUrl !== undefined) {
       liveBlog.mainImageUrl = mainImageUrl;
       if (mainImageUrl && !liveBlog.mediaGallery.includes(mainImageUrl)) {

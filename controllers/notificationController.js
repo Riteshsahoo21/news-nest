@@ -12,15 +12,8 @@ export const getNotifications = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const isPremium = user.isPremium || user.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
-
     // Determine target audiences this user belongs to
-    const audiences = ['all'];
-    if (isPremium) {
-      audiences.push('premium_only');
-    } else {
-      audiences.push('free_only');
-    }
+    const audiences = ['all', 'free_only'];
 
     // Fetch personal notifications AND targeted global notifications
     const notifications = await Notification.find({
@@ -144,14 +137,7 @@ export const markAllAsRead = async (req, res) => {
        return res.status(404).json({ error: 'User not found' });
     }
     
-    const isPremium = user.isPremium || user.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
-    
-    const audiences = ['all'];
-    if (isPremium) {
-      audiences.push('premium_only');
-    } else {
-      audiences.push('free_only');
-    }
+    const audiences = ['all', 'free_only'];
 
     // 1. Update specific user notifications directly
     await Notification.updateMany(
@@ -182,7 +168,14 @@ export const markAllAsRead = async (req, res) => {
       }));
 
     if (newReceipts.length > 0) {
-      await NotificationReadReceipt.insertMany(newReceipts);
+      const ops = newReceipts.map(receipt => ({
+        updateOne: {
+          filter: { userId: receipt.userId, notificationId: receipt.notificationId },
+          update: { $setOnInsert: receipt },
+          upsert: true
+        }
+      }));
+      await NotificationReadReceipt.bulkWrite(ops);
     }
 
     res.json({ message: 'All notifications marked as read' });

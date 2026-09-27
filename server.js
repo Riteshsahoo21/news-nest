@@ -21,18 +21,16 @@ import searchRoutes from './routes/searchRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
-import subscriptionRoutes from './routes/subscriptionRoutes.js';
-import stripeRoutes from './routes/stripeRoutes.js';
 import reporterApplicationRoutes from './routes/reporterApplicationRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import adRoutes from './routes/adRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import revenueRoutes from './routes/revenueRoutes.js';
-import { stripeWebhook } from './controllers/stripeController.js';
+import scraperRoutes from './routes/scraperRoutes.js';
+import automationRoutes from './routes/automationRoutes.js';
 import { initQueues } from './workers/newsQueue.js';
 import { initNewsletterCron } from './cron/newsletterScheduler.js';
-import { initSubscriptionCron } from './cron/subscriptionScheduler.js';
 import { seedDefaultRoles } from './utils/seedRoles.js';
 import { getGeneralSitemap, getGoogleNewsSitemap, getRssFeed } from './controllers/sitemapController.js';
 import { socialBotInterceptor } from './middleware/socialBotInterceptor.js';
@@ -103,9 +101,6 @@ io.on('connection', (socket) => {
 // Middleware
 app.use(cors());
 
-// Stripe Webhook needs raw body, BEFORE express.json()
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
-
 app.use(express.json());
 
 // Attach io to req so controllers can use it
@@ -136,14 +131,14 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/stripe', stripeRoutes);
 app.use('/api/reporter-applications', reporterApplicationRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/ads', adRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/revenue', revenueRoutes);
+app.use('/api/scraper', scraperRoutes);
+app.use('/api/automation', automationRoutes);
 
 app.get('/', (req, res) => {
   res.send('News Nests Backend API is running.');
@@ -158,7 +153,7 @@ app.get('/api/protected', verifyToken, (req, res) => {
 });
 
 // Example route using Firebase Admin
-app.get('/api/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ status: 'ok', firebaseApp: firebaseApp ? firebaseApp.name : 'uninitialized' });
 });
 
@@ -169,7 +164,6 @@ server.listen(PORT, '0.0.0.0', () => {
   // Initialize BullMQ Queues (replaces initCronJobs)
   initQueues();
   initNewsletterCron();
-  initSubscriptionCron();
 
   // Error handling middleware
 });

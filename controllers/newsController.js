@@ -1,40 +1,253 @@
+import axios from 'axios';
 import News from '../models/News.js';
 import Comment from '../models/Comment.js';
+import { trackUniqueView } from '../utils/viewTracker.js';
+import { getFullArticleContent } from '../services/hybridNewsService.js';
+import { reverseGeocode } from '../services/locationService.js';
+import { buildSearchFilter, escapeRegExp } from '../utils/searchQuery.js';
+import { discoverLocalNews } from '../services/liveDiscoveryService.js';
+import { notifyArticleApprovedInBackground } from '../services/automationWebhookService.js';
 
 // Helper to determine sort logic
 const getSortObject = (sort) => {
   if (sort === 'most_viewed') return { views: -1 };
   if (sort === 'most_liked') return { likesCount: -1 };
-  return { createdAt: -1 }; // 'newest' is default
+  return { publishedAt: -1, createdAt: -1 }; // 'newest' is default
+};
+
+const NEWS_SEARCH_FIELDS = [
+  'title', 'subtitle', 'content', 'category', 'subCategory', 'tags',
+  'author', 'sourceName', 'country', 'region', 'city', 'aiSummary', 'keyTakeaways'
+];
+
+// Helper: Smart Shuffling & Priority Algorithm for Reporter vs Aggregator News
+const applyReporterPriorityShuffle = (newsArray) => {
+  if (!Array.isArray(newsArray) || newsArray.length === 0) return newsArray;
+  
+  const reporterStories = [];
+  const aggregatorStories = [];
+  
+  newsArray.forEach(article => {
+    // Treat articles with authorId as genuine native reporter publications
+    if (article.authorId) {
+      reporterStories.push(article);
+    } else {
+      aggregatorStories.push(article);
+    }
+  });
+  
+  if (reporterStories.length === 0) return newsArray;
+  
+  const shuffled = [];
+  let repIdx = 0;
+  let aggIdx = 0;
+  
+  // Rule 1: Priority Placement - Ensure up to the 2 newest reporter articles sit at the very top
+  while (repIdx < Math.min(2, reporterStories.length)) {
+    shuffled.push(reporterStories[repIdx]);
+    repIdx++;
+  }
+  
+  // Rule 2: Interleaving - For remaining news, insert 1 reporter article for every 3 automated aggregator stories
+  while (repIdx < reporterStories.length || aggIdx < aggregatorStories.length) {
+    for (let i = 0; i < 3 && aggIdx < aggregatorStories.length; i++) {
+      shuffled.push(aggregatorStories[aggIdx]);
+      aggIdx++;
+    }
+    if (repIdx < reporterStories.length) {
+      shuffled.push(reporterStories[repIdx]);
+      repIdx++;
+    }
+  }
+  
+  return shuffled;
 };
 
 // Get all news
 export const getAllNews = async (req, res) => {
   try {
-    const { sort, q, limit } = req.query;
+    const { sort, q, limit, country, subCategory, language } = req.query;
     const sortObj = getSortObject(sort);
     
     let filter = {};
     if (!req.query.allStatus) {
       filter.status = 'approved';
     }
+
+    // Country filtering
+    if (country && country !== 'all') {
+      filter.country = country.toLowerCase();
+    }
+
+    // SubCategory filtering (e.g. 'esports', 'regional', 'national')
+    if (subCategory && subCategory !== 'all') {
+      filter.subCategory = subCategory.toLowerCase();
+    }
+
+    // Language filtering (e.g. 'en', 'hi')
+    if (language && language !== 'all') {
+      filter.language = language.toLowerCase();
+    }
+
+    // Search query
     if (q) {
+      const searchFilter = buildSearchFilter(q, NEWS_SEARCH_FIELDS);
+      if (searchFilter) Object.assign(filter, searchFilter);
+    } else if (!country && !subCategory && !req.query.category && !req.query.allStatus) {
+      // Default home view: show verified authentic global/national news + reporter articles
       filter.$or = [
-        { title: { $regex: q, $options: 'i' } },
-        { content: { $regex: q, $options: 'i' } },
-        { category: { $regex: q, $options: 'i' } }
+        { isFeaturedOnHome: true },
+        { authorId: { $ne: null } }
       ];
     }
     
     let query = News.find(filter).sort(sortObj);
-    if (limit) {
-      query = query.limit(parseInt(limit));
+    const targetLimit = limit ? parseInt(limit) : null;
+    if (targetLimit) {
+      // Query larger pool before shuffling so recent reporter news isn't excluded by a flood of aggregator news
+      query = query.limit(Math.max(targetLimit * 2, 100));
     }
-    const news = await query;
+    let news = await query;
+    
+    // Apply reporter priority shuffling for readers on newest/default sorts
+    if (!req.query.allStatus && (!sort || sort === 'newest') && !q) {
+      news = applyReporterPriorityShuffle(news);
+    }
+    
+    if (targetLimit && news.length > targetLimit) {
+      news = news.slice(0, targetLimit);
+    }
+    
     res.json(news);
   } catch (error) {
     console.error('Error fetching all news:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get location-aware news. Exact city/region matches are returned first and
+// then supplemented with country coverage so sparse local feeds never produce
+// an empty home screen.
+export const getLocalNews = async (req, res) => {
+  try {
+    const rawLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 30;
+    const fallbackCountry = typeof req.query.country === 'string'
+      ? req.query.country.trim().toLowerCase().slice(0, 2)
+      : '';
+
+    let location;
+    try {
+      location = await reverseGeocode(req.query.latitude, req.query.longitude);
+    } catch (error) {
+      if (!fallbackCountry) throw error;
+      location = {
+        latitude: Number(req.query.latitude),
+        longitude: Number(req.query.longitude),
+        city: '',
+        region: '',
+        country: fallbackCountry.toUpperCase(),
+        countryCode: fallbackCountry,
+        label: fallbackCountry.toUpperCase(),
+        approximate: true
+      };
+    }
+
+    const countryCode = (location.countryCode || fallbackCountry || 'global').toLowerCase();
+    const baseFilter = { status: 'approved' };
+    if (countryCode !== 'global') {
+      baseFilter.country = { $in: [countryCode, 'global'] };
+    }
+
+    const placeNames = Array.from(new Set([location.city, location.region].filter(Boolean)));
+    const placeMatchers = placeNames.map((place) => new RegExp(escapeRegExp(place), 'i'));
+    const localSignals = placeMatchers.flatMap((regex) => ([
+      { city: { $regex: regex } },
+      { region: { $regex: regex } },
+      { title: { $regex: regex } },
+      { subtitle: { $regex: regex } },
+      { tags: { $regex: regex } }
+    ]));
+
+    let exactArticles = [];
+    if (localSignals.length > 0) {
+      exactArticles = await News.find({
+        ...baseFilter,
+        $or: localSignals
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(limit);
+    }
+
+    let discovery = { attempted: false };
+    const minimumLocalInventory = Math.min(limit, 8);
+    if (exactArticles.length < minimumLocalInventory) {
+      discovery = await discoverLocalNews(location, {
+        country: countryCode,
+        limit: Math.min(6, Math.max(3, minimumLocalInventory - exactArticles.length))
+      });
+
+      if (
+        localSignals.length > 0 &&
+        ((discovery.acceptedCount || 0) > 0 || (discovery.skippedCompleteCount || 0) > 0)
+      ) {
+        exactArticles = await News.find({
+          ...baseFilter,
+          $or: localSignals
+        })
+          .sort({ publishedAt: -1, createdAt: -1 })
+          .limit(limit);
+      }
+    }
+
+    let remaining = limit - exactArticles.length;
+    let nearbyArticles = exactArticles;
+    let countryFallbackCount = 0;
+    let countryArticles = [];
+    if (remaining > 0 && countryCode !== 'global') {
+      countryArticles = await News.find({
+        status: 'approved',
+        country: countryCode,
+        _id: { $nin: exactArticles.map((article) => article._id) }
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(remaining);
+      nearbyArticles = [...nearbyArticles, ...countryArticles];
+      countryFallbackCount = countryArticles.length;
+      remaining -= countryArticles.length;
+    }
+
+    let globalArticles = [];
+    if (remaining > 0) {
+      globalArticles = await News.find({
+        status: 'approved',
+        _id: { $nin: nearbyArticles.map((article) => article._id) }
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(remaining);
+      nearbyArticles = [...nearbyArticles, ...globalArticles];
+    }
+
+    res.json({
+      location,
+      articles: nearbyArticles,
+      localArticles: exactArticles,
+      fallbackArticles: [...countryArticles, ...globalArticles],
+      countryArticles,
+      globalArticles,
+      exactMatches: exactArticles.length,
+      fallbackUsed: exactArticles.length < nearbyArticles.length,
+      countryFallbackCount,
+      discovery
+    });
+  } catch (error) {
+    console.error('Error fetching local news:', error.message);
+    const statusCode = error.statusCode || 502;
+    res.status(statusCode).json({
+      error: statusCode === 400
+        ? error.message
+        : 'Unable to determine your region right now. Please select a country instead.'
+    });
   }
 };
 
@@ -45,11 +258,27 @@ export const getNewsById = async (req, res) => {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     const query = isObjectId ? { _id: id } : { slug: id };
     
-    // We increment views directly here
-    const news = await News.findOneAndUpdate(query, { $inc: { views: 1 } }, { new: true }).populate('likes', 'fullName');
+    // Fetch the news first to get its ID
+    let news = await News.findOne(query)
+      .populate('likes', 'fullName')
+      .populate('relatedArticles', 'title slug subtitle imageUrl mainImageUrl publishedAt');
     
     if (!news) {
       return res.status(404).json({ error: 'News article not found' });
+    }
+
+    // The enrichment service decides whether body, media or summary details are
+    // still missing. Calling it here also repairs older partially-fetched rows.
+    if (news.sourceUrl) {
+      news = await getFullArticleContent(news);
+    }
+
+    // Only increment views if this is a unique view for this IP/User
+    const isUnique = await trackUniqueView(req, news._id, 'News');
+    if (isUnique) {
+      news = await News.findByIdAndUpdate(news._id, { $inc: { views: 1 } }, { new: true })
+        .populate('likes', 'fullName')
+        .populate('relatedArticles', 'title slug subtitle imageUrl mainImageUrl publishedAt');
     }
 
     // Fetch associated comments using confirmed news._id
@@ -92,7 +321,8 @@ export const getTrendingNews = async (req, res) => {
 export const getNewsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
-    const sortObj = getSortObject(req.query.sort);
+    const { sort, limit } = req.query;
+    const sortObj = getSortObject(sort);
     
     let catQuery = (category || '').toLowerCase().trim();
     if (catQuery === 'tech') catQuery = 'technology';
@@ -100,7 +330,19 @@ export const getNewsByCategory = async (req, res) => {
     if (catQuery === 'ent') catQuery = 'entertainment';
     if (catQuery === 'sci') catQuery = 'science';
     
-    const news = await News.find({ category: catQuery, status: 'approved' }).sort(sortObj);
+    const targetLimit = limit ? parseInt(limit) : null;
+    let query = News.find({ category: catQuery, status: 'approved' }).sort(sortObj);
+    if (targetLimit) {
+      query = query.limit(Math.max(targetLimit * 2, 100));
+    }
+    let news = await query;
+    
+    if (!sort || sort === 'newest') {
+      news = applyReporterPriorityShuffle(news);
+    }
+    if (targetLimit && news.length > targetLimit) {
+      news = news.slice(0, targetLimit);
+    }
     
     res.json(news);
   } catch (error) {
@@ -112,13 +354,17 @@ export const getNewsByCategory = async (req, res) => {
 // Create a news article
 export const createNews = async (req, res) => {
   try {
-    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt } = req.body;
+    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt, tags } = req.body;
     
-    // Get image URL from Cloudinary if a file was uploaded
-    let imageUrl = req.body.imageUrl || '';
-    if (req.file && req.file.path) {
-      imageUrl = req.file.path;
+    // Process multiple uploaded images
+    let mediaUrls = [];
+    if (req.files && req.files.length > 0) {
+      mediaUrls = req.files.map(file => file.path);
+    } else if (req.body.imageUrl) {
+      // Fallback if passing single URL via body
+      mediaUrls = [req.body.imageUrl];
     }
+    let imageUrl = mediaUrls.length > 0 ? mediaUrls[0] : '';
 
     if (!title || !content || !category) {
       return res.status(400).json({ error: 'Please provide title, content, and category' });
@@ -159,7 +405,11 @@ export const createNews = async (req, res) => {
       videoDuration,
       status: initialStatus,
       scheduledAt: finalScheduledAt,
+      mediaUrls,
+      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []),
     });
+
+    if (newsArticle.status === 'approved') notifyArticleApprovedInBackground(newsArticle);
 
     res.status(201).json({
       message: 'News article created successfully',
@@ -188,6 +438,8 @@ export const updateNews = async (req, res) => {
       return res.status(404).json({ error: 'Article not found' });
     }
 
+    if (updates.status === 'approved') notifyArticleApprovedInBackground(updatedArticle);
+
     res.json({
       message: 'News article updated successfully',
       article: updatedArticle
@@ -205,7 +457,7 @@ export const updateNews = async (req, res) => {
 export const updateDraft = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt } = req.body;
+    const { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration, action, scheduledAt, tags } = req.body;
 
     const article = await News.findById(id);
     if (!article) return res.status(404).json({ error: 'Article not found' });
@@ -219,7 +471,16 @@ export const updateDraft = async (req, res) => {
     }
 
     const updates = { title, content, category, author, isEditorPick, isTrending, subtitle, readTime, videoUrl, videoDuration };
-    if (req.file && req.file.path) updates.imageUrl = req.file.path;
+    if (tags !== undefined) {
+      updates.tags = Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []);
+    }
+    
+    // Process new files if uploaded
+    if (req.files && req.files.length > 0) {
+      updates.mediaUrls = req.files.map(file => file.path);
+      updates.imageUrl = updates.mediaUrls[0];
+    }
+    
     if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
 
     const permissions = req.user.permissions || [];
@@ -234,6 +495,7 @@ export const updateDraft = async (req, res) => {
     }
 
     const updatedArticle = await News.findByIdAndUpdate(id, updates, { new: true });
+    if (updatedArticle?.status === 'approved') notifyArticleApprovedInBackground(updatedArticle);
     res.json({ message: 'Draft updated', article: updatedArticle });
   } catch (error) {
     console.error('Error updating draft:', error);
@@ -329,8 +591,12 @@ export const saveNews = async (req, res) => {
     const saveIndex = news.savedBy.indexOf(userId);
     if (saveIndex === -1) {
       news.savedBy.push(userId); // Add save
+      news.isPermanent = true;
     } else {
       news.savedBy.splice(saveIndex, 1); // Remove save
+      if (news.savedBy.length === 0) {
+        news.isPermanent = false;
+      }
     }
 
     await news.save();
@@ -430,6 +696,7 @@ export const approveNews = async (req, res) => {
     
     news.rejectionReason = '';
     await news.save();
+    if (news.status === 'approved') notifyArticleApprovedInBackground(news);
     
     res.json({ message: 'Article approved', article: news });
   } catch (error) {
@@ -481,5 +748,82 @@ export const getNewsByAuthor = async (req, res) => {
   } catch (error) {
     console.error('Error fetching news by author:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get related news
+export const getRelatedNews = async (req, res) => {
+  try {
+    const { articleId, tags, category } = req.query;
+    
+    let queryTags = [];
+    if (tags) {
+      queryTags = (Array.isArray(tags) ? tags : tags.split(',')).map(t => t.trim()).filter(Boolean);
+    }
+
+    // Build the query to find related news
+    let filter = { status: 'approved' };
+    
+    // Exclude the current article if provided
+    if (articleId) {
+      filter._id = { $ne: articleId };
+    }
+
+    // Match by tags (highest priority) or category
+    if (queryTags.length > 0) {
+      filter.tags = { $in: queryTags };
+    } else if (category) {
+      filter.category = category.toLowerCase();
+    }
+
+    // Fetch related articles
+    let relatedNews = await News.find(filter).sort({ createdAt: -1 }).limit(3).select('title slug imageUrl createdAt');
+    
+    // If not enough related news by tags, fallback to category
+    if (relatedNews.length < 3 && category && queryTags.length > 0) {
+      const excludeIds = relatedNews.map(n => n._id);
+      if (articleId) excludeIds.push(articleId);
+      
+      const moreNews = await News.find({
+        _id: { $nin: excludeIds },
+        status: 'approved',
+        category: category.toLowerCase()
+      }).sort({ createdAt: -1 }).limit(3 - relatedNews.length).select('title slug imageUrl createdAt');
+      
+      relatedNews = [...relatedNews, ...moreNews];
+    }
+    
+    res.json(relatedNews);
+  } catch (error) {
+    console.error('Error fetching related news:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Stream & proxy external images to bypass hotlinking protection (403 Forbidden)
+export const proxyImage = async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+      return res.status(400).send('Valid image URL required');
+    }
+
+    const parsed = new URL(url);
+    const response = await axios.get(url, {
+      responseType: 'stream',
+      timeout: 9000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Referer': `${parsed.protocol}//${parsed.hostname}/`
+      }
+    });
+
+    const contentType = response.headers['content-type'] || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    response.data.pipe(res);
+  } catch (error) {
+    res.status(404).send('Image fetch failed');
   }
 };

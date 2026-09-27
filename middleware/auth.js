@@ -93,16 +93,6 @@ export const authorizePermissions = (...requiredPermissions) => {
           });
         }
 
-        if (requiredPermissions.includes('create_content')) {
-          const isReporter = roles.includes('reporter');
-          const isAdminOrEditor = roles.includes('admin') || roles.includes('editor');
-          
-          if (isReporter && !isAdminOrEditor) {
-             if (!user.isPremium) {
-                return res.status(403).json({ error: 'Your premium subscription has expired. You must have an active plan to post content.' });
-             }
-          }
-        }
       }
 
       // Merge allowedCategories from all roles

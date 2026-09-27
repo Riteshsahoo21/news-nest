@@ -1,21 +1,31 @@
 import { Queue, Worker } from 'bullmq';
-import { fetchAndSaveCurrentsNews } from '../services/currentsService.js';
+import { syncHarmonizedNews } from '../services/unifiedNewsAggregator.js';
 import { fetchAndSaveYouTubeNews, fetchAndSaveCategoryVideos } from '../services/youtubeService.js';
 import News from '../models/News.js';
 import redisClient from '../config/redis.js';
 
 // Define Queues
-export const currentsQueue = new Queue('currentsQueue', { connection: redisClient });
-export const youtubeQueue = new Queue('youtubeQueue', { connection: redisClient });
-export const publisherQueue = new Queue('publisherQueue', { connection: redisClient });
+export const currentsQueue = redisClient ? new Queue('currentsQueue', { connection: redisClient }) : null;
+export const youtubeQueue = redisClient ? new Queue('youtubeQueue', { connection: redisClient }) : null;
+export const publisherQueue = redisClient ? new Queue('publisherQueue', { connection: redisClient }) : null;
 
 // Add repeatable jobs (Equivalent to node-cron)
 export const initQueues = async () => {
+  if (!redisClient) {
+    console.warn('BullMQ disabled because Redis is not configured.');
+    return false;
+  }
+
   console.log('Initializing BullMQ queues...');
 
-  // Currents API: Every hour
+  // Curated RSS + multi-provider discovery + full extraction: every hour
   await currentsQueue.add('fetchCurrents', {}, {
     repeat: { pattern: '0 * * * *' }
+  });
+  await currentsQueue.add('fetchNewsOnStartup', {}, {
+    // One warm-up per hour across restarts/deploy replicas. The worker's
+    // deduplication keeps the database free of repeated stories.
+    jobId: `news-startup-${Math.floor(Date.now() / (60 * 60 * 1000))}`
   });
 
   // YouTube API: Every 6 hours
@@ -29,15 +39,16 @@ export const initQueues = async () => {
   });
 
   console.log('BullMQ repeatable jobs registered.');
+  return true;
 };
 
 // Define Workers
-export const currentsWorker = new Worker('currentsQueue', async (job) => {
-  console.log('BullMQ: Running Currents API fetch...');
-  await fetchAndSaveCurrentsNews();
-}, { connection: redisClient });
+export const currentsWorker = redisClient ? new Worker('currentsQueue', async (job) => {
+  console.log('BullMQ: Running synchronized RSS/GDELT/Google/Bing scraper pipeline...');
+  await syncHarmonizedNews(8);
+}, { connection: redisClient }) : null;
 
-export const youtubeWorker = new Worker('youtubeQueue', async (job) => {
+export const youtubeWorker = redisClient ? new Worker('youtubeQueue', async (job) => {
   console.log('BullMQ: Running YouTube API fetch...');
   await fetchAndSaveYouTubeNews();
 
@@ -47,9 +58,9 @@ export const youtubeWorker = new Worker('youtubeQueue', async (job) => {
     // Add delay to prevent rate limiting
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-}, { connection: redisClient });
+}, { connection: redisClient }) : null;
 
-export const publisherWorker = new Worker('publisherQueue', async (job) => {
+export const publisherWorker = redisClient ? new Worker('publisherQueue', async (job) => {
   const now = new Date();
   const result = await News.updateMany(
     { status: 'scheduled', scheduledAt: { $lte: now } },
@@ -58,10 +69,10 @@ export const publisherWorker = new Worker('publisherQueue', async (job) => {
   if (result.modifiedCount > 0) {
     console.log(`BullMQ: Published ${result.modifiedCount} scheduled posts.`);
   }
-}, { connection: redisClient });
+}, { connection: redisClient }) : null;
 
 // Error handling for workers
-[currentsWorker, youtubeWorker, publisherWorker].forEach(worker => {
+[currentsWorker, youtubeWorker, publisherWorker].filter(Boolean).forEach(worker => {
   worker.on('failed', (job, err) => {
     console.error(`Job ${job.id} failed in queue ${worker.name}:`, err.message);
   });
