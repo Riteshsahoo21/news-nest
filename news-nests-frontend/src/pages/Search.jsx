@@ -70,7 +70,7 @@ export default function Search() {
     liveRefreshTimer.current = setTimeout(() => {
       livePollCount.current += 1;
       fetchResults(searchQuery, 1, false, true);
-    }, 2500);
+    }, 1200);
   };
 
   const fetchResults = async (searchQuery, page = 1, append = false, background = false) => {

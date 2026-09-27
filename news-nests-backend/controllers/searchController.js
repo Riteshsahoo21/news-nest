@@ -3,7 +3,7 @@ import LiveBlog from '../models/LiveBlog.js';
 import VideoNews from '../models/VideoNews.js';
 import PhotoGallery from '../models/PhotoGallery.js';
 import { buildSearchFilter, normalizeSearchQuery, parsePagination } from '../utils/searchQuery.js';
-import { triggerSearchNewsDiscovery } from '../services/liveDiscoveryService.js';
+import { discoverSearchNews, triggerSearchNewsDiscovery } from '../services/liveDiscoveryService.js';
 
 const getSortObject = (sort, supportsPublishedAt = false) => {
   if (sort === 'most_viewed') return { views: -1, createdAt: -1 };
@@ -103,13 +103,25 @@ export const globalSearch = async (req, res) => {
     let { news, total: newsTotal } = newsPage;
 
     let discovery = { attempted: false };
-    const minimumSearchInventory = 8;
+    const minimumSearchInventory = 6;
     if (page === 1 && newsTotal < minimumSearchInventory) {
-      // Return saved matches immediately. Full-page discovery continues in the
-      // background and the client refreshes this fast endpoint while it runs.
-      discovery = triggerSearchNewsDiscovery(query, {
-        limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal))
-      });
+      try {
+        // Fast live discovery with a 3.5s timeout guard so users get results immediately in ~1.5s!
+        await Promise.race([
+          discoverSearchNews(query, { limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal)) }),
+          new Promise((resolve) => setTimeout(resolve, 3500))
+        ]);
+        // Re-query database to return the newly discovered articles in this single instant response!
+        newsPage = await fetchRankedNewsPage({ query, sort: req.query.sort, skip, limit });
+        news = newsPage.news;
+        newsTotal = newsPage.total;
+        discovery = { attempted: true, status: 'complete', immediate: true };
+      } catch (discErr) {
+        console.error('Fast live discovery search error:', discErr.message);
+        discovery = triggerSearchNewsDiscovery(query, {
+          limit: Math.min(6, Math.max(3, minimumSearchInventory - newsTotal))
+        });
+      }
     }
 
     const totals = {

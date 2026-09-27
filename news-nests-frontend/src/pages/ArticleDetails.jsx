@@ -331,7 +331,12 @@ export default function ArticleDetails() {
               />
             </div>
 
-            <BackstoryCard backstory={article.backstory} className="mb-8" />
+            <BackstoryCard 
+              articleId={article.slug || article._id} 
+              initialBackstoryData={article.backstoryData}
+              initialBackstory={article.backstory}
+              className="mb-8" 
+            />
 
             <FormattedArticleContent 
               content={article.content} 

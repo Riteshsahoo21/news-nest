@@ -553,7 +553,12 @@ export default function ArticleModal({ articleId, onClose }) {
                   className="mb-6"
                 />
 
-                <BackstoryCard backstory={article.backstory} className="mb-6" />
+                <BackstoryCard 
+                  articleId={article.slug || article._id || articleId} 
+                  initialBackstoryData={article.backstoryData}
+                  initialBackstory={article.backstory}
+                  className="mb-6" 
+                />
 
                 {/* Structured Editorial Content */}
                 <div className="py-2">

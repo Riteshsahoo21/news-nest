@@ -20,7 +20,8 @@ import {
   getNewsByAuthor,
   getRelatedNews,
   proxyImage,
-  getLocalNews
+  getLocalNews,
+  generateArticleBackstory
 } from '../controllers/newsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
@@ -38,6 +39,8 @@ router.get('/editor-picks', cacheMiddleware(60), getEditorPicks);
 router.get('/trending', cacheMiddleware(60), getTrendingNews);
 router.get('/author/:authorId', getNewsByAuthor);
 router.get('/article/:id', getNewsById);
+router.post('/article/:id/backstory', generateArticleBackstory);
+router.get('/article/:id/backstory', generateArticleBackstory);
 router.post('/article/:id/share', shareNews);
 
 // --- Protected Workflow Routes ---

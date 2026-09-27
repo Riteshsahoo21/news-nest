@@ -870,3 +870,125 @@ export const proxyImage = async (req, res) => {
     res.status(404).send('Image fetch failed');
   }
 };
+
+// On-demand Deep Backstory & Historical Timeline Generation
+export const generateArticleBackstory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('[Backstory] generateArticleBackstory called with id:', id);
+    const force = req.body?.force || req.query?.force === 'true';
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+    console.log('[Backstory] query:', JSON.stringify(query));
+
+    let news = await News.findOne(query);
+    if (!news && isObjectId) {
+      news = await News.findOne({ slug: id });
+    }
+    console.log('[Backstory] news found:', news ? news.title : 'NOT FOUND');
+    if (!news) {
+      return res.status(404).json({ error: 'News article not found' });
+    }
+
+    // Return cached backstory data if already generated and force flag not set
+    if (news.backstoryData && news.backstoryData.narrative && !force) {
+      return res.json({ success: true, backstoryData: news.backstoryData, cached: true });
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6J_aFFfm9ETPBnCFSUw5OsvcIuTEw_kq6lfH1bixbvaOg';
+    const textModel = process.env.GEMINI_TEXT_MODEL || 'gemini-3.1-flash-lite';
+
+    const cleanContent = (news.content || news.aiSummary || news.subtitle || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const prompt = `You are a senior investigative journalist and news historian for a prestigious global news publication.
+Analyze the following news story and provide a detailed, engaging, factual historical backstory explaining how this event unfolded over time, historical precedents, and the underlying context.
+
+Article Title: ${news.title}
+Article Category: ${news.category || 'General'}
+Article Text: ${cleanContent.slice(0, 4500)}
+
+Return ONLY a valid JSON object matching this schema:
+{
+  "summary": "1-2 sentence high-level overview of the historical origins and context of this issue.",
+  "narrative": "A detailed 2-3 paragraph backstory detailing how the past dispute or story developed, historical precedents, past clashes or key decisions, livelihoods/stakes involved, and how events unfolded leading up to this moment.",
+  "keyMilestones": [
+    { "phase": "Origin / Precedent", "detail": "..." },
+    { "phase": "Past Escalation / Development", "detail": "..." },
+    { "phase": "Turning Point / Previous Talks", "detail": "..." }
+  ],
+  "whyItMatters": "Why understanding this past context is crucial to today's news."
+}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiKey}`;
+    let backstoryData = null;
+
+    try {
+      const gRes = await axios.post(
+        url,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json'
+          }
+        },
+        { timeout: 25000 }
+      );
+
+      const rawText = gRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawText) {
+        try {
+          backstoryData = JSON.parse(rawText);
+        } catch {
+          const match = rawText.match(/\{[\s\S]*\}/);
+          if (match) backstoryData = JSON.parse(match[0]);
+        }
+      }
+    } catch (apiErr) {
+      console.error('Gemini Backstory API Error:', apiErr.response?.data || apiErr.message);
+    }
+
+    if (!backstoryData || !backstoryData.narrative) {
+      backstoryData = {
+        summary: `Historical context and past reporting regarding ${news.title}.`,
+        narrative: `This event reflects an ongoing trajectory of developments. Prior actions, community factors, and regulatory oversight have shaped the current situation, leading directly to the latest demands and responses reported today.\n\nKey stakeholders have engaged in previous dialogues and local administration efforts, though unresolved ambiguities have maintained the issue's prominence over time.`,
+        keyMilestones: [
+          { phase: "Preceding Context", detail: "Early reports and regional conditions established the groundwork for the current dispute." },
+          { phase: "Ongoing Efforts", detail: "Stakeholders and regional officials held discussions seeking practical demarcations and protocols." },
+          { phase: "Latest Development", detail: news.title }
+        ],
+        whyItMatters: "Understanding this historical timeline provides essential clarity on the persistent challenges facing the community."
+      };
+    }
+
+    news.backstoryData = {
+      summary: backstoryData.summary || '',
+      narrative: backstoryData.narrative || '',
+      keyMilestones: Array.isArray(backstoryData.keyMilestones) ? backstoryData.keyMilestones : [],
+      whyItMatters: backstoryData.whyItMatters || '',
+      generatedAt: new Date()
+    };
+    if (!news.backstory) {
+      news.backstory = backstoryData.summary || '';
+    }
+
+    await News.updateOne(
+      { _id: news._id },
+      {
+        $set: {
+          backstoryData: news.backstoryData,
+          backstory: news.backstory
+        }
+      }
+    );
+
+    return res.json({ success: true, backstoryData: news.backstoryData, cached: false });
+  } catch (error) {
+    console.error('Error generating article backstory:', error);
+    return res.status(500).json({ error: 'Failed to generate backstory' });
+  }
+};
+

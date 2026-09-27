@@ -197,6 +197,18 @@ const newsSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    backstoryData: {
+      summary: { type: String, default: '' },
+      narrative: { type: String, default: '' },
+      keyMilestones: [
+        {
+          phase: { type: String, default: '' },
+          detail: { type: String, default: '' }
+        }
+      ],
+      whyItMatters: { type: String, default: '' },
+      generatedAt: { type: Date, default: null }
+    },
     relatedArticles: [
       {
         type: mongoose.Schema.Types.ObjectId,

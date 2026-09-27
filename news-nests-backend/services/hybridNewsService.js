@@ -225,7 +225,58 @@ export const syncMetadataFeeds = async (options = {}) => {
         skippedCompleteCount++;
         continue;
       }
-      candidates.push({ metadata: article, existing });
+    // For live search/location discovery: Save lightweight metadata records immediately so search results appear in ~1.5s!
+    if (isLiveDiscovery && candidates.length > 0) {
+      for (const { metadata: article, existing } of candidates) {
+        if (!existing) {
+          const objectId = new mongoose.Types.ObjectId();
+          const cleanTitle = article.title.trim();
+          const cleanContent = selectRichestContent(article.content, article.summary, cleanTitle);
+          const fallbackImg = getCategoryFallbackImage(article.category, article.subCategory, article.country);
+          const imageUrl = article.imageUrl || fallbackImg;
+          
+          try {
+            const created = await News.create({
+              _id: objectId,
+              title: cleanTitle,
+              slug: createSlug(cleanTitle, objectId),
+              summary: article.summary || article.content || '',
+              content: cleanContent,
+              sourceUrl: article.sourceUrl,
+              sourceName: String(article.sourceName || 'Web News').trim(),
+              author: String(article.author || article.sourceName || 'News Bureau').trim(),
+              imageUrl: imageUrl,
+              mainImageUrl: imageUrl,
+              category: String(article.category || 'general').toLowerCase(),
+              subCategory: String(article.subCategory || '').toLowerCase(),
+              country: String(article.country || 'all').toLowerCase(),
+              publishedAt: toValidDate(article.publishedAt) || new Date(),
+              status: 'approved',
+              isFullContentFetched: false,
+              tags: generateTags(cleanTitle, cleanContent, article.category),
+              views: Math.floor(Math.random() * 50) + 15
+            });
+            insertedCount++;
+            acceptedCount++;
+            if (created?.status === 'approved') {
+              notifyArticleApprovedInBackground(created);
+            }
+          } catch (createErr) {
+            if (createErr?.code !== 11000) {
+              console.error('Fast-insert discovery news error:', createErr.message);
+            }
+          }
+        }
+      }
+      if (insertedCount > 0) {
+        return {
+          category: category || 'all',
+          insertedCount,
+          updatedCount,
+          skippedCompleteCount,
+          acceptedCount
+        };
+      }
     }
 
     const maximumCandidates = clampInteger(

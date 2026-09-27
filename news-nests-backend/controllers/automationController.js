@@ -82,6 +82,7 @@ export const updateNewsSemanticData = async (req, res) => {
 
     const update = {
       backstory: cleanString(req.body.backstory, 2000),
+      backstoryData: req.body.backstoryData && typeof req.body.backstoryData === 'object' ? req.body.backstoryData : undefined,
       relatedArticles,
       isDuplicateEcho: toBoolean(req.body.isDuplicateEcho),
       embeddingId: cleanString(req.body.embeddingId, 100)
