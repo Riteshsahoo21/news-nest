@@ -9,24 +9,19 @@ const UserLayout = () => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  // Redirect system admins away from public pages
   if (isAuthenticated && user) {
     const userRoles = user.roles || (user.role ? [user.role] : []);
     const userPermissions = user.permissions || [];
-    
     const isSystemAdmin = userRoles.some(r => ['admin'].includes(r)) || userPermissions.includes('view_admin_panel');
-    
-    // Only redirect if they are not already trying to go to an admin page, 
-    // though UserLayout shouldn't handle admin routes anyway.
     if (isSystemAdmin) {
       return <Navigate to="/admin" replace />;
     }
   }
+
   return (
-    <div className="flex flex-col min-h-screen relative overflow-x-hidden w-full">
+    <div className="flex flex-col min-h-screen relative overflow-x-hidden w-full max-w-full min-w-0">
       <Navbar />
-      {/* Main content area needs bottom padding on mobile to avoid overlap with BottomNav */}
-      <main className="flex-1 pb-16 md:pb-0 flex flex-col">
+      <main className="flex-1 pb-20 md:pb-0 flex flex-col w-full max-w-full overflow-x-hidden min-w-0">
         <Outlet />
       </main>
       <Footer />

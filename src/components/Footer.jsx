@@ -4,8 +4,8 @@ import { Mail, MapPin, Phone } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-card border-t border-border mt-auto pt-16 pb-8 md:pb-12">
-      <div className="max-w-[1640px] mx-auto px-3 sm:px-6 md:px-10 xl:px-12">
+    <footer className="bg-card border-t border-border mt-auto pt-12 pb-28 md:pb-12 w-full max-w-full overflow-hidden min-w-0">
+      <div className="max-w-[1640px] mx-auto px-3.5 sm:px-6 md:px-10 xl:px-12 w-full min-w-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           
           {/* Brand & About */}
@@ -78,7 +78,7 @@ export default function Footer() {
           <div>
             <h3 className="font-bold text-lg mb-6 text-foreground">Support</h3>
             <ul className="space-y-4 text-sm">
-              <li><Link to="/subscriptions" className="text-muted-foreground hover:text-primary transition-colors">Subscription Plans</Link></li>
+              <li><Link to="/apply-reporter" className="text-muted-foreground hover:text-primary transition-colors">Join as Reporter</Link></li>
               <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Contact Us</a></li>
               <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a></li>
               <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</a></li>

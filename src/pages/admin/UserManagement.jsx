@@ -29,10 +29,7 @@ const UserManagement = () => {
       }
 
       if (rolesRes.status === 'fulfilled') {
-        const fetchedRoles = rolesRes.value.data;
-        const premiumRole = { _id: 'premium_pseudo', name: 'registered_premium', displayName: 'Registered Premium' };
-        const reporterPremiumRole = { _id: 'reporter_premium_pseudo', name: 'reporter_premium', displayName: 'Reporter (Premium Registered)' };
-        setRoles([...fetchedRoles, premiumRole, reporterPremiumRole]);
+        setRoles(rolesRes.value.data);
       } else {
         console.error('Failed to fetch roles', rolesRes.reason);
       }
@@ -48,10 +45,7 @@ const UserManagement = () => {
       await api.put(`/users/${userId}/role`, { roles: newRoles });
       setUsers(users.map(u => {
         if (u._id === userId) {
-          const selected = newRoles[0];
-          const isSettingPremium = ['registered_premium', 'reporter_premium'].includes(selected);
-          const actualRole = selected === 'registered_premium' ? 'registered_user' : selected === 'reporter_premium' ? 'reporter' : selected;
-          return { ...u, roles: [actualRole], role: actualRole, isPremium: isSettingPremium };
+          return { ...u, roles: newRoles, role: newRoles[0] };
         }
         return u;
       }));
@@ -146,10 +140,7 @@ const UserManagement = () => {
                          email.toLowerCase().includes(query.toLowerCase());
                 })
                 .map((user) => {
-                  const baseRole = (user.roles && user.roles.length > 0) ? user.roles[0] : (user.role || 'registered_user');
-                  const currentRole = user.isPremium
-                    ? (baseRole === 'registered_user' ? 'registered_premium' : baseRole === 'reporter' ? 'reporter_premium' : baseRole)
-                    : baseRole;
+                  const currentRole = (user.roles && user.roles.length > 0) ? user.roles[0] : (user.role || 'registered_user');
                   return (
                 <tr key={user._id} className="hover:bg-gray-50/50 transition-colors bg-white group">
                   <td className="px-6 py-4">

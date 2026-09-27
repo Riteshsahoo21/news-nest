@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import api from '../../services/api';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Trash2, Send, CheckCircle, Mail, Clock, AlertCircle } from 'lucide-react';
+import { Trash2, Send, CheckCircle, Mail, Clock, AlertCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -12,6 +12,9 @@ export default function Newsletter() {
   // Subscribers state
   const [subscribers, setSubscribers] = useState([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Campaigns state
   const [campaigns, setCampaigns] = useState([]);
@@ -84,6 +87,7 @@ export default function Newsletter() {
     try {
       const res = await api.get('/newsletter/subscribers');
       setSubscribers(res.data);
+      setCurrentPage(1);
     } catch (err) {
       console.error(err);
     } finally {
@@ -132,6 +136,19 @@ export default function Newsletter() {
     }
   };
 
+  const filteredSubscribers = useMemo(() => {
+    return subscribers.filter(sub => 
+      sub.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [subscribers, searchQuery]);
+
+  const totalPages = Math.ceil(filteredSubscribers.length / itemsPerPage) || 1;
+  
+  const paginatedSubscribers = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredSubscribers.slice(start, start + itemsPerPage);
+  }, [filteredSubscribers, currentPage]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -159,11 +176,26 @@ export default function Newsletter() {
       {/* SUBSCRIBERS TAB */}
       {activeTab === 'subscribers' && (
         <div className="bg-card text-card-foreground rounded-xl border shadow-sm overflow-hidden">
-          <div className="p-6 border-b flex justify-between items-center">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
+          <div className="p-6 border-b flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <h3 className="font-semibold text-lg flex items-center gap-2 whitespace-nowrap">
               <UserIcon className="w-5 h-5 text-primary" /> Active Subscribers ({subscribers.filter(s => s.isActive).length})
             </h3>
-            <Button variant="outline" size="sm" onClick={fetchSubscribers}>Refresh</Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  type="text" 
+                  placeholder="Search subscribers..." 
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={fetchSubscribers}>Refresh</Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -178,10 +210,10 @@ export default function Newsletter() {
               <tbody className="divide-y divide-border">
                 {loadingSubs ? (
                   <tr><td colSpan="4" className="text-center py-8">Loading...</td></tr>
-                ) : subscribers.length === 0 ? (
+                ) : paginatedSubscribers.length === 0 ? (
                   <tr><td colSpan="4" className="text-center py-8 text-muted-foreground">No subscribers found.</td></tr>
                 ) : (
-                  subscribers.map((sub) => (
+                  paginatedSubscribers.map((sub) => (
                     <tr key={sub._id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 font-medium">{sub.email}</td>
                       <td className="px-6 py-4">
@@ -203,6 +235,34 @@ export default function Newsletter() {
               </tbody>
             </table>
           </div>
+          {filteredSubscribers.length > itemsPerPage && (
+            <div className="p-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSubscribers.length)} of {filteredSubscribers.length} entries
+              </span>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                </Button>
+                <div className="text-sm font-medium px-2 text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

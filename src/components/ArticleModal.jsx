@@ -1,28 +1,66 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Share2, Send, X, Play, Bookmark, Trash2, Ban } from 'lucide-react';
+import { Heart, Share2, Send, X, Bookmark, Check, ExternalLink, AlertCircle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import AdSlot from './ads/AdSlot';
 import CommentThread, { buildCommentTree } from './CommentThread';
 import SeoHead from './SeoHead';
+import FormattedArticleContent from './FormattedArticleContent';
+import SafeImage from './common/SafeImage';
+import AiSummaryCard from './AiSummaryCard';
+import BackstoryCard from './BackstoryCard';
+import { useSearchParams } from 'react-router-dom';
 
 export default function ArticleModal({ articleId, onClose }) {
+  const [currentSearchParams] = useSearchParams();
   const [article, setArticle] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const [relatedNews, setRelatedNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const { user } = useAuth();
   const isStaff = user?.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
   const isAdmin = user?.roles?.includes('admin');
-  const isAdFree = user?.isPremium || isStaff;
   const socketRef = useRef(null);
   const contentRef = useRef(null);
   
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialType, setInterstitialType] = useState('interstitial');
   const [countdown, setCountdown] = useState(5);
+  const [copied, setCopied] = useState(false);
+
+  const getArticleUrl = (id) => {
+    const nextParams = new URLSearchParams(currentSearchParams);
+    nextParams.set('articleId', id);
+    return `?${nextParams.toString()}`;
+  };
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareTitle = article ? article.title : 'News Nests Article';
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          url: shareUrl
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      alert(`Share link: ${shareUrl}`);
+    }
+  };
 
   useEffect(() => {
     if (!articleId) return;
@@ -46,25 +84,42 @@ export default function ArticleModal({ articleId, onClose }) {
     const fetchArticle = async () => {
       try {
         setLoading(true);
+        setError('');
+        setArticle(null);
         const response = await api.get(`/news/article/${articleId}`);
         setArticle(response.data.article);
         setComments(response.data.comments || []);
         
-        if (!isAdFree) {
+        if (response.data.article) {
+          const { category, tags, _id } = response.data.article;
+          
+          let queryUrl = `/news/related?articleId=${_id}`;
+          if (category) queryUrl += `&category=${category}`;
+          if (tags && tags.length > 0) queryUrl += `&tags=${tags.join(',')}`;
+          
+          try {
+            const relatedRes = await api.get(queryUrl);
+            setRelatedNews(relatedRes.data);
+          } catch (e) {
+            console.error('Failed to fetch related news', e);
+          }
+        }
+        
+        // Only staff preview custom interstitials
+        if (isStaff) {
           let readArticles = [];
           try {
-            readArticles = JSON.parse(sessionStorage.getItem('free_articles_read_list')) || [];
-          } catch (e) {
+            readArticles = JSON.parse(sessionStorage.getItem('staff_articles_read_list')) || [];
+          } catch {
             readArticles = [];
           }
           
           if (!readArticles.includes(articleId)) {
             readArticles.push(articleId);
-            sessionStorage.setItem('free_articles_read_list', JSON.stringify(readArticles));
+            sessionStorage.setItem('staff_articles_read_list', JSON.stringify(readArticles));
           }
           
           let readCount = readArticles.length;
-          console.log(`[Ad System Modal] User has read ${readCount} unique articles:`, readArticles);
 
           let lastAdTime = parseInt(sessionStorage.getItem('last_ad_shown_time') || '0', 10);
           const now = Date.now();
@@ -79,6 +134,7 @@ export default function ArticleModal({ articleId, onClose }) {
         }
       } catch (err) {
         console.error('Failed to fetch article', err);
+        setError(err.response?.data?.error || 'This article could not be loaded. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -90,7 +146,7 @@ export default function ArticleModal({ articleId, onClose }) {
       socketRef.current.emit('leave_article', articleId);
       socketRef.current.disconnect();
     };
-  }, [articleId, isAdFree]);
+  }, [articleId, isStaff, retryKey]);
 
   useEffect(() => {
     let timer;
@@ -101,6 +157,17 @@ export default function ArticleModal({ articleId, onClose }) {
     }
     return () => clearInterval(timer);
   }, [showInterstitial, countdown]);
+
+  useEffect(() => {
+    if (articleId) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [articleId]);
 
   // Handle closing modal when clicking outside
   const handleOverlayClick = (e) => {
@@ -178,7 +245,7 @@ export default function ArticleModal({ articleId, onClose }) {
     if (!article) return;
     try {
       const targetId = article._id || articleId;
-      const res = await api.put(`/news/article/${targetId}/save`);
+      await api.put(`/news/article/${targetId}/save`);
       setArticle(prev => {
         const wasSaved = prev.savedBy?.some(s => (s?._id || s || '').toString() === userId.toString());
         const updatedSavedBy = wasSaved 
@@ -250,7 +317,7 @@ export default function ArticleModal({ articleId, onClose }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end"
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex flex-col justify-end sm:justify-end"
           onClick={handleOverlayClick}
         >
           {article && (
@@ -270,23 +337,60 @@ export default function ArticleModal({ articleId, onClose }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="bg-background w-full max-w-3xl mx-auto rounded-t-3xl h-[92vh] flex flex-col overflow-hidden shadow-2xl relative"
+            className="bg-background w-full max-w-3xl mx-auto rounded-none sm:rounded-t-3xl h-full sm:h-[92vh] flex flex-col overflow-hidden shadow-2xl relative border-t border-border/50"
           >
-            {/* Drag Indicator Header */}
-            <div className="flex justify-center pt-3 pb-2 sticky top-0 bg-background z-10" onClick={onClose}>
-              <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full"></div>
+            {/* Sticky Editorial Top Navigation Bar */}
+            <div className="flex items-center justify-between px-3.5 sm:px-5 py-3 sticky top-0 bg-background/95 backdrop-blur-md border-b border-border/60 z-20 shadow-xs shrink-0">
+              <button 
+                onClick={onClose}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold bg-muted/80 hover:bg-muted text-foreground transition-all duration-200 shadow-xs group"
+                aria-label="Close Article"
+              >
+                <span className="text-sm sm:text-base leading-none transition-transform group-hover:-translate-x-0.5">←</span>
+                <span>Back</span>
+              </button>
+              
+              <div className="flex items-center space-x-2 sm:space-x-4 text-muted-foreground">
+                <button onClick={handleLike} className={`flex items-center space-x-1 p-1.5 transition-colors group ${isLiked ? 'text-red-500 font-bold' : 'hover:text-red-500'}`} title="Like Article">
+                  <Heart className={`w-5 h-5 transition-transform group-hover:scale-110 ${isLiked ? 'text-red-500 fill-red-500 drop-shadow-[0_2px_8px_rgba(239,68,68,0.4)]' : ''}`} />
+                  <span className="text-xs sm:text-sm font-semibold">{article?.likesCount || 0}</span>
+                </button>
+                
+                <button onClick={handleSave} className={`p-1.5 transition-colors group ${isSaved ? 'text-blue-500' : 'hover:text-blue-500'}`} title="Bookmark">
+                  <Bookmark className={`w-5 h-5 transition-transform group-hover:scale-110 ${isSaved ? 'text-blue-500 fill-blue-500 drop-shadow-[0_2px_8px_rgba(59,130,246,0.4)]' : ''}`} />
+                </button>
+
+                <div className="relative flex items-center">
+                  <button onClick={handleShare} className="p-1.5 hover:text-primary transition-colors flex items-center justify-center" title="Share Article">
+                    {copied ? <Check className="w-5 h-5 text-green-500 animate-in zoom-in-50" /> : <Share2 className="w-5 h-5 hover:scale-110 transition-transform" />}
+                  </button>
+                  {copied && (
+                    <span className="absolute top-9 right-0 text-[10px] bg-red-600 font-mono text-white px-2.5 py-1 rounded shadow-lg z-50 whitespace-nowrap uppercase font-extrabold tracking-wider animate-in fade-in-0 duration-200">
+                      ✓ Copied Link!
+                    </span>
+                  )}
+                </div>
+
+                <button 
+                  onClick={onClose}
+                  className="p-1.5 hover:text-foreground text-muted-foreground transition-colors hidden sm:flex items-center justify-center rounded-full hover:bg-muted" 
+                  title="Close Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {loading ? (
               <div className="flex-1 flex justify-center items-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
               </div>
             ) : showInterstitial ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50 text-center relative z-20 overflow-y-auto">
-                <h2 className="text-2xl font-bold mb-2">Sponsor Message</h2>
-                <p className="text-gray-500 mb-8">Your article will load shortly...</p>
+              <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-card text-center relative z-20 overflow-y-auto w-full max-w-full min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold mb-2 text-foreground">Sponsor Message</h2>
+                <p className="text-muted-foreground mb-6 sm:mb-8 text-sm sm:text-base">Your article will load shortly...</p>
                 
-                <div className={`w-full max-w-2xl bg-black border border-gray-100 rounded overflow-hidden flex items-center justify-center mb-8 ${interstitialType === 'video_interstitial' ? 'aspect-video' : 'h-[30vh] min-h-[200px] max-h-[400px]'}`}>
+                <div className={`w-full max-w-2xl bg-black border border-border/80 rounded-xl overflow-hidden flex items-center justify-center mb-6 sm:mb-8 ${interstitialType === 'video_interstitial' ? 'aspect-video' : 'h-[30vh] min-h-[200px] max-h-[360px]'}`}>
                   <AdSlot 
                     position={interstitialType} 
                     className="m-0 w-full h-full" 
@@ -294,69 +398,85 @@ export default function ArticleModal({ articleId, onClose }) {
                   />
                 </div>
                 
-                <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+                <div className="flex flex-col items-center gap-3.5 w-full max-w-sm">
                   <button 
                     disabled={countdown > 0}
                     onClick={() => setShowInterstitial(false)}
-                    className={`w-full py-3 rounded-lg font-bold transition-all ${countdown > 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                    className={`w-full py-3.5 rounded-xl font-bold text-sm sm:text-base transition-all ${countdown > 0 ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg'}`}
                   >
                     {countdown > 0 ? `Skip Ad in ${countdown}s` : 'Skip Ad & Read Article'}
                   </button>
-                  {countdown === 0 && (
-                    <a href="/subscriptions" className="text-red-600 font-medium hover:underline text-sm">
-                      Remove Ads with Premium
-                    </a>
-                  )}
+                </div>
+              </div>
+            ) : error ? (
+              <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+                <AlertCircle className="w-10 h-10 text-red-600 mb-4" />
+                <h2 className="text-xl font-bold text-foreground mb-2">Unable to load this report</h2>
+                <p className="text-sm text-muted-foreground max-w-md mb-5">{error}</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRetryKey((value) => value + 1)}
+                    className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700"
+                  >
+                    Try again
+                  </button>
+                  <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-border text-sm font-bold">
+                    Close
+                  </button>
                 </div>
               </div>
             ) : article ? (
-              <div className="flex-1 overflow-y-auto px-5 pb-20 custom-scrollbar" ref={contentRef}>
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pb-24 sm:pb-20 custom-scrollbar max-w-full min-w-0" ref={contentRef}>
                 
-                {/* Category & Actions */}
-                <div className="flex justify-between items-center mb-4 pt-2">
-                  <span className="bg-red-100 text-red-600 px-3 py-1 rounded font-bold text-xs uppercase tracking-wider">
-                    {article.category}
+                {/* Category & Read Time Badge */}
+                <div className="flex items-center justify-between gap-2 mb-3.5 sm:mb-4 pt-4 sm:pt-6">
+                  <span className="inline-block bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded-md font-extrabold text-[11px] sm:text-xs uppercase tracking-wider font-mono border border-red-600/20 shadow-xs">
+                    {article.category || 'GLOBAL NEWS'}
                   </span>
-                  <div className="flex items-center space-x-5 text-muted-foreground">
-                    <button onClick={handleLike} className={`flex items-center space-x-1.5 transition-all duration-200 group ${isLiked ? 'text-red-500 font-semibold' : 'hover:text-red-500'}`}>
-                      <motion.div
-                        animate={{ 
-                          scale: isLiked ? [1, 1.35, 0.85, 1.15, 1] : 1,
-                          rotateZ: isLiked ? [0, -15, 15, -5, 0] : 0,
-                          y: isLiked ? [0, -3, 0] : 0
-                        }}
-                        transition={{ duration: 0.4, type: "spring", stiffness: 300 }}
-                      >
-                        <Heart className={`w-5 h-5 transition-colors duration-200 ${isLiked ? 'text-red-500 fill-red-500 drop-shadow-[0_2px_8px_rgba(239,68,68,0.5)]' : 'group-hover:text-red-500'}`} />
-                      </motion.div>
-                      <span className="text-sm">{article.likesCount || 0}</span>
-                    </button>
-                    <button onClick={handleSave} className={`transition-all duration-200 group ${isSaved ? 'text-blue-500' : 'hover:text-blue-500'}`}>
-                      <motion.div
-                        animate={{ 
-                          scale: isSaved ? [1, 1.35, 0.85, 1.1, 1] : 1,
-                          rotateY: isSaved ? [0, 180, 360] : 0,
-                          y: isSaved ? [0, -3, 0] : 0
-                        }}
-                        transition={{ duration: 0.45, type: "spring", stiffness: 260 }}
-                      >
-                        <Bookmark className={`w-5 h-5 transition-colors duration-200 ${isSaved ? 'text-blue-500 fill-blue-500 drop-shadow-[0_2px_8px_rgba(59,130,246,0.5)]' : 'group-hover:text-blue-500'}`} />
-                      </motion.div>
-                    </button>
-                    <button className="hover:text-primary transition-colors">
-                      <Share2 className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <span className="text-xs text-muted-foreground font-semibold font-sans">
+                    {article.readTime || Math.max(2, Math.ceil((article.content?.length || 800) / 600))} min read
+                  </span>
                 </div>
 
                 {/* Title & Metadata */}
-                <h1 className="text-2xl md:text-3xl font-bold font-serif leading-snug mb-3 text-foreground">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-serif leading-snug sm:leading-tight mb-3 sm:mb-4 text-foreground break-words">
                   {article.title}
                 </h1>
-                
-                <div className="text-sm text-muted-foreground mb-6">
-                  Published {new Date(article.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {article.readTime || 4} min read
+                {article.subtitle && article.subtitle !== article.title && (
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-4">
+                    {article.subtitle}
+                  </p>
+                )}
+                 
+                <div className="text-xs sm:text-sm text-muted-foreground font-sans font-medium mb-5 sm:mb-6 pb-3 sm:pb-4 border-b border-border/60 flex items-center gap-x-2 gap-y-1 flex-wrap">
+                  <span className="text-foreground font-bold">By {article.author || 'Newsroom Desk'}</span>
+                  <span className="opacity-40">•</span>
+                   <span>Published {new Date(article.publishedAt || article.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                   {article.sourceName && (
+                     <>
+                       <span className="opacity-40">•</span>
+                       <span>Source: {article.sourceName}</span>
+                     </>
+                   )}
+                   {(article.city || article.region || (article.country && article.country !== 'global')) && (
+                     <>
+                       <span className="opacity-40">•</span>
+                       <span>{[article.city, article.region, article.country?.toUpperCase()].filter(Boolean).join(', ')}</span>
+                     </>
+                   )}
                 </div>
+
+                {/* Tags */}
+                {article.tags && article.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {article.tags.map((tag, idx) => (
+                      <span key={idx} className="bg-muted text-muted-foreground px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider border border-border/60">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {/* Video Coverage / Main Image */}
                 {article.videoUrl ? (
@@ -381,28 +501,109 @@ export default function ArticleModal({ articleId, onClose }) {
                       </video>
                     )}
                   </div>
-                ) : article.imageUrl ? (
-                  <figure className="mb-6 rounded-xl overflow-hidden shadow-sm border border-border/50">
-                    <img src={article.imageUrl} alt={article.title} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
-                  </figure>
-                ) : null}
-
-                {/* Content */}
-                <div className="prose prose-lg dark:prose-invert max-w-none text-foreground leading-relaxed text-base md:text-lg space-y-5">
-                  <div dangerouslySetInnerHTML={{ __html: article.content }} />
-                </div>
-
-                {/* Ad Placeholder */}
-                {!isAdFree && (
-                  <>
-                    <AdSlot position="in-article" className="mb-4" />
-                    <div className="my-8 bg-muted/30 border border-border/60 rounded-xl p-4 flex items-center space-x-4 shadow-sm">
-                      <div className="bg-muted-foreground/20 text-muted-foreground text-xs px-2 py-0.5 rounded font-bold">AD</div>
-                      <div className="font-medium text-sm md:text-base">Upgrade to Premium today for a completely Ad-Free feed.</div>
+                ) : article.mediaUrls && article.mediaUrls.length > 1 ? (
+                  <div className="mb-6 grid gap-4">
+                    <figure className="rounded-xl overflow-hidden shadow-sm border border-border/50">
+                      <SafeImage 
+                        src={article.mediaUrls[0].startsWith('http') ? article.mediaUrls[0] : `http://localhost:5000/${article.mediaUrls[0].replace('\\', '/')}`} 
+                        alt={article.title} 
+                        category={article.category}
+                        subCategory={article.subCategory}
+                        country={article.country}
+                        className="w-full max-h-[400px] object-cover" 
+                      />
+                    </figure>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {article.mediaUrls.slice(1).map((url, idx) => (
+                        <figure key={idx} className="rounded-xl overflow-hidden shadow-sm border border-border/50 aspect-[4/3]">
+                          <SafeImage 
+                            src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
+                            alt={`${article.title} ${idx + 2}`} 
+                            category={article.category}
+                            subCategory={article.subCategory}
+                            country={article.country}
+                            className="w-full h-full object-cover" 
+                          />
+                        </figure>
+                      ))}
                     </div>
-                  </>
+                  </div>
+                ) : (
+                  <figure className="mb-6 rounded-xl overflow-hidden shadow-sm border border-border/50">
+                    <SafeImage 
+                      src={article.imageUrl ? (article.imageUrl.startsWith('http') ? article.imageUrl : `http://localhost:5000/${article.imageUrl.replace('\\', '/')}`) : article.mainImageUrl} 
+                      alt={article.title} 
+                      category={article.category}
+                      subCategory={article.subCategory}
+                      country={article.country}
+                      className="w-full h-auto object-cover max-h-[500px]" 
+                    />
+                  </figure>
                 )}
 
+                <AiSummaryCard
+                  aiSummary={article.aiSummary}
+                  keyTakeaways={article.keyTakeaways}
+                  className="mb-6"
+                />
+
+                <BackstoryCard backstory={article.backstory} className="mb-6" />
+
+                {/* Structured Editorial Content */}
+                <div className="py-2">
+                  <FormattedArticleContent 
+                    content={article.content} 
+                    author={article.author || 'News Bureau'} 
+                    mediaUrls={article.mediaUrls || []}
+                    category={article.category}
+                    subCategory={article.subCategory}
+                    country={article.country}
+                  />
+                </div>
+
+                {article.sourceUrl && (
+                  <a
+                    href={article.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
+                  >
+                    Read the original report at {article.sourceName || 'the publisher'}
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+
+                {/* Ad Preview for Staff */}
+                {isStaff && (
+                  <div className="my-6">
+                    <AdSlot position="in-article" className="mb-4" />
+                  </div>
+                )}
+
+
+                {/* Related News Section */}
+                {relatedNews.length > 0 && (
+                  <div className="mt-10 pt-8 border-t border-border/50">
+                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                      <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
+                      Related News
+                    </h3>
+                    <div className="flex flex-col space-y-4">
+                      {relatedNews.map((news) => (
+                        <div key={news._id} className="group relative">
+                          <a 
+                            href={getArticleUrl(news.slug || news._id)}
+                            className="block p-4 rounded-xl border border-gray-100 hover:border-red-100 hover:bg-red-50/50 transition-all duration-300"
+                          >
+                            <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors line-clamp-2">
+                              {news.title}
+                            </h4>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Comments Section */}
                 <div className="mt-10 pt-8 border-t border-border/50">

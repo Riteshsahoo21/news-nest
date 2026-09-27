@@ -23,7 +23,8 @@ import {
   Tag,
   DollarSign,
   User,
-  Globe
+  Globe,
+  Newspaper
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -32,7 +33,7 @@ const AdminLayout = () => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'SEO & Indexing', path: '/admin/seo-management', icon: Globe },
+    // { name: 'SEO & Indexing', path: '/admin/seo-management', icon: Globe },
     { name: 'My Profile', path: '/admin/profile', icon: User },
     { name: 'Editorial Approvals', path: '/admin/approvals', icon: FileText },
     { name: 'Content Management', path: '/admin/content', icon: Files },
@@ -44,45 +45,47 @@ const AdminLayout = () => {
     { name: 'Newsletter', path: '/admin/newsletter', icon: Mail },
     { name: 'Advertisement', path: '/admin/ads', icon: Megaphone },
     { name: 'Notifications', path: '/admin/broadcast-notifications', icon: Bell },
-    { name: 'Subscription Plans', path: '/admin/subscription-plans', icon: CreditCard },
-    { name: 'Coupons', path: '/admin/coupons', icon: Tag },
-    { name: 'Revenue Reports', path: '/admin/revenue', icon: DollarSign },
     { name: 'Reporter Apps', path: '/admin/reporter-applications', icon: FileText },
     { name: 'Audit Logs', path: '/admin/audit-logs', icon: Activity },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
-    // { name: 'Reports', path: '/admin/reports', icon: FileText },
+    { name: 'Reports & Analytics', path: '/admin/reports', icon: PieChart },
   ];
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity"
           onClick={closeMobileMenu}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-72 bg-slate-950 text-slate-300 flex flex-col transform transition-transform duration-300 ease-in-out shadow-2xl
         md:relative md:translate-x-0
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-red-600">Admin Panel</h1>
+        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-950/50">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20">
+              <Newspaper className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Admin <span className="text-red-500">Panel</span></h1>
+          </div>
           <button 
-            className="md:hidden text-gray-500 hover:text-gray-700"
+            className="md:hidden text-slate-400 hover:text-white transition-colors"
             onClick={closeMobileMenu}
           >
             <X className="h-6 w-6" />
           </button>
         </div>
         
-        <nav className="flex-1 overflow-y-auto py-4">
-          <ul className="space-y-1 px-3">
+        <nav className="flex-1 overflow-y-auto py-6 custom-scrollbar">
+          <ul className="space-y-1.5 px-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -92,14 +95,14 @@ const AdminLayout = () => {
                     end={item.path === '/admin'}
                     onClick={closeMobileMenu}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      `group flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                         isActive
-                          ? 'bg-red-50 text-red-600'
-                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          ? 'bg-gradient-to-r from-red-600/20 to-transparent text-red-500 border-l-2 border-red-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
+                          : 'text-slate-400 hover:bg-white/5 hover:text-slate-100 hover:translate-x-1'
                       }`
                     }
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-5 w-5 transition-transform group-hover:scale-110" />
                     {item.name}
                   </NavLink>
                 </li>
@@ -108,36 +111,55 @@ const AdminLayout = () => {
           </ul>
         </nav>
         
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-white/10 bg-slate-950/80 backdrop-blur-sm">
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-red-600 transition-colors"
+            className="flex items-center justify-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-all duration-200 group"
           >
-            <LogOut className="h-5 w-5" />
-            Logout
+            <LogOut className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+            Secure Logout
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Mobile header */}
-        <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <header className="md:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-slate-600 hover:text-slate-900 bg-slate-100 p-2 rounded-lg transition-colors"
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-lg font-bold text-red-600">Admin Panel</h1>
+            <h1 className="text-lg font-bold text-slate-900">Admin</h1>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50">
-          <Outlet />
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </div>
       </main>
+
+      {/* Add custom scrollbar styles globally for the sidebar if needed */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.1);
+          border-radius: 4px;
+        }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.2);
+        }
+      `}} />
     </div>
   );
 };

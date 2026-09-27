@@ -6,16 +6,17 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import AdSlot from './ads/AdSlot';
 import CommentThread, { buildCommentTree } from './CommentThread';
+import SafeImage from './common/SafeImage';
 
 export default function PhotoGalleryModal({ galleryId, onClose }) {
   const [gallery, setGallery] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const [relatedNews, setRelatedNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const isStaff = user?.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
   const isAdmin = user?.roles?.includes('admin');
-  const isAdFree = user?.isPremium || isStaff;
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialType, setInterstitialType] = useState('interstitial');
   const [countdown, setCountdown] = useState(5);
@@ -42,17 +43,32 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
         setGallery(response.data.gallery);
         setComments(response.data.comments || []);
         
-        if (!isAdFree) {
+        if (response.data.gallery) {
+          const { category, tags, _id } = response.data.gallery;
+          let queryUrl = `/photo-galleries/related?galleryId=${_id}`;
+          if (category) queryUrl += `&category=${category}`;
+          if (tags && tags.length > 0) queryUrl += `&tags=${tags.join(',')}`;
+          
+          try {
+            const relatedRes = await api.get(queryUrl);
+            setRelatedNews(relatedRes.data);
+          } catch (e) {
+            console.error('Failed to fetch related news', e);
+          }
+        }
+        
+        // Only staff preview custom interstitials
+        if (isStaff) {
           let readArticles = [];
           try {
-            readArticles = JSON.parse(sessionStorage.getItem('free_articles_read_list')) || [];
+            readArticles = JSON.parse(sessionStorage.getItem('staff_gallery_read_list')) || [];
           } catch (e) {
             readArticles = [];
           }
           
           if (!readArticles.includes(galleryId)) {
             readArticles.push(galleryId);
-            sessionStorage.setItem('free_articles_read_list', JSON.stringify(readArticles));
+            sessionStorage.setItem('staff_gallery_read_list', JSON.stringify(readArticles));
           }
           
           let readCount = readArticles.length;
@@ -83,7 +99,7 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
       }
       document.body.style.overflow = 'unset';
     };
-  }, [galleryId, isAdFree]);
+  }, [galleryId, isStaff]);
 
   useEffect(() => {
     let timer;
@@ -294,10 +310,23 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
               </button>
             </div>
 
+            {/* Tags */}
+            {gallery.tags && gallery.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {gallery.tags.map((tag, idx) => (
+                  <span key={idx} className="bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider border border-gray-200">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Description */}
-            <p className="text-gray-600 leading-relaxed mb-8">
-              {gallery.description}
-            </p>
+            <div className="prose prose-base sm:prose-lg dark:prose-invert max-w-none mb-10">
+              <p className="text-foreground/90 font-sans leading-relaxed whitespace-pre-wrap text-base md:text-lg border-l-4 border-red-600 pl-4 py-1">
+                {gallery.description}
+              </p>
+            </div>
 
             {/* Dynamically Adjusting Photo Grid */}
             <div className={`grid gap-4 md:gap-6 mb-12 ${gallery.photos?.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
@@ -329,6 +358,42 @@ export default function PhotoGalleryModal({ galleryId, onClose }) {
                 );
               })}
             </div>
+
+            {/* Related News Section */}
+            {relatedNews.length > 0 && (
+              <div className="mt-10 pt-8 border-t border-border/50 max-w-4xl mx-auto px-4 w-full">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="w-2 h-6 bg-red-600 rounded-sm inline-block"></span>
+                  Related Photo Galleries
+                </h3>
+                <div className="flex flex-col space-y-4">
+                  {relatedNews.map((news) => (
+                    <div key={news._id} className="group relative">
+                      <a 
+                      key={news._id}
+                      href={`?galleryId=${news.slug || news._id}`}
+                      className="block group bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-red-100 hover:shadow-xl transition-all duration-300"
+                      onClick={(e) => {
+                          // Handle navigation
+                        }}
+                      >
+                        <div className="flex items-center gap-4">
+                          <SafeImage 
+                            src={news.imageUrl || news.mainImageUrl} 
+                            alt={news.title} 
+                            category={news.category}
+                            className="w-20 h-20 object-cover rounded-lg flex-shrink-0" 
+                          />
+                          <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors line-clamp-2">
+                            {news.title}
+                          </h4>
+                        </div>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Comments Section */}
             <div className="mt-10 pt-8 border-t border-gray-200">

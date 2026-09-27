@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserCircle, LogOut, FileEdit, ShieldCheck, Bookmark, Image as ImageIcon, PlaySquare, FileText, Star, MapPin, Link as LinkIcon, Globe, Edit2, X, Check, Camera, AlertCircle, CheckCircle, Radio } from 'lucide-react';
+import { UserCircle, LogOut, FileEdit, ShieldCheck, Bookmark, Image as ImageIcon, PlaySquare, FileText, Star, MapPin, Link as LinkIcon, Globe, Edit2, X, Check, Camera, AlertCircle, CheckCircle, Radio, ExternalLink, CreditCard } from 'lucide-react';
 import { Twitter, Linkedin } from '../components/BrandIcons';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +15,7 @@ export default function Profile() {
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [mobileTab, setMobileTab] = useState('library'); // 'library', 'settings', 'workspace'
   const [updating, setUpdating] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef(null);
@@ -56,7 +57,7 @@ export default function Profile() {
     if (user) {
       setEditForm({
         fullName: user.fullName || '',
-        username: user.username || user.fullName.toLowerCase().replace(/\s+/g, ''),
+        username: user.username || (user.fullName || '').toLowerCase().replace(/\s+/g, ''),
         mobileNumber: user.mobileNumber || '',
         bio: user.bio || '',
         location: user.location || '',
@@ -110,6 +111,7 @@ export default function Profile() {
       await api.put('/user/profile', payload);
       await refreshUser();
       setIsEditing(false);
+      setMobileTab('library');
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
       console.error('Failed to update profile', err);
@@ -195,8 +197,427 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      {/* Premium Cover Header */}
-      <div className="h-48 md:h-64 w-full bg-gradient-to-r from-slate-900 via-red-900 to-slate-900 relative rounded-b-[2.5rem] md:rounded-b-[4rem] shadow-lg mb-16 md:mb-20 overflow-hidden">
+      {/* ===================================================================================
+          MOBILE VIEW: "Executive Passport & Digital Hub" (sm:hidden)
+          =================================================================================== */}
+      <div className="sm:hidden w-full min-w-0 max-w-full px-3.5 pt-3 pb-12">
+        
+        {/* 1. Executive Passport ID Card */}
+        <div className="w-full min-w-0 bg-gradient-to-br from-neutral-900 via-stone-900 to-neutral-950 text-white rounded-3xl p-5 mb-5 border border-neutral-800 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex items-center gap-3 relative z-10">
+            <Link to={`/user/${user._id}`} className="flex items-center gap-3.5 flex-1 min-w-0 group cursor-pointer" title="View Public Profile">
+              <div className="relative w-16 h-16 shrink-0 rounded-full border-2 border-red-500/80 group-hover:border-red-400 p-0.5 overflow-hidden shadow-lg bg-neutral-900 transition-all">
+                {user.profilePicture && !user.profilePicture.includes('ui-avatars') ? (
+                  <img src={user.profilePicture} alt={user.fullName} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <UserCircle className="w-full h-full text-neutral-500" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-xl font-black font-serif text-white group-hover:text-red-400 transition-colors truncate tracking-tight">{user.fullName}</h1>
+                  <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-red-400 shrink-0 opacity-80" />
+                </div>
+                <p className="text-xs font-mono font-medium text-red-400 truncate">@{user.username || (user.fullName || '').toLowerCase().replace(/\s+/g, '')}</p>
+                
+                {user.location && (
+                  <p className="flex items-center text-[11px] text-neutral-400 mt-1 font-mono truncate">
+                    <MapPin className="w-3 h-3 mr-1 shrink-0 text-red-500" /> {user.location}
+                  </p>
+                )}
+              </div>
+            </Link>
+            <button 
+              onClick={() => setMobileTab('settings')}
+              className="p-2.5 rounded-2xl bg-neutral-800/80 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 transition-all shrink-0 ml-1"
+              aria-label="Edit Profile"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Membership & Roles Bar */}
+          <div className="flex items-center flex-wrap gap-2 mt-4 pt-3.5 border-t border-neutral-800/80 text-[11px] font-mono font-extrabold uppercase tracking-wider">
+            {userRoles.some(r => ['admin'].includes(r)) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                System Admin
+              </span>
+            )}
+            {userRoles.includes('reporter') && !userRoles.some(r => ['admin', 'editor'].includes(r)) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                Reporter
+              </span>
+            )}
+            {userRoles.includes('editor') && !userRoles.some(r => ['admin'].includes(r)) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                Editor
+              </span>
+            )}
+            {!userRoles.length && (
+              <span className="text-neutral-400 px-2 py-0.5 rounded bg-neutral-800/60">
+                Community Member
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Three-Tab Digital Hub Navigation */}
+        <div className="grid grid-cols-3 gap-1 p-1 bg-muted/60 dark:bg-neutral-900 border border-border/80 rounded-2xl mb-6 shadow-inner">
+          <button
+            onClick={() => setMobileTab('library')}
+            className={`flex flex-col items-center justify-center py-2 px-0.5 rounded-xl font-extrabold text-[10px] sm:text-[11px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+              mobileTab === 'library'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+            }`}
+          >
+            <div className="flex items-center gap-1 max-w-full">
+              <Bookmark className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Library</span>
+            </div>
+            <span className={`text-[9px] sm:text-[10px] mt-0.5 px-1.5 py-0 rounded-full font-sans ${mobileTab === 'library' ? 'bg-white/20 text-white' : 'bg-background text-foreground'}`}>
+              {bookmarks.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setMobileTab('settings')}
+            className={`flex flex-col items-center justify-center py-2 px-0.5 rounded-xl font-extrabold text-[10px] sm:text-[11px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+              mobileTab === 'settings'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Edit2 className="w-3.5 h-3.5 mb-0.5 shrink-0" />
+            <span className="truncate">Edit Profile</span>
+          </button>
+
+          <button
+            onClick={() => setMobileTab('workspace')}
+            className={`flex flex-col items-center justify-center py-2 px-0.5 rounded-xl font-extrabold text-[10px] sm:text-[11px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+              mobileTab === 'workspace'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 mb-0.5 shrink-0" />
+            <span className="truncate">Workspace</span>
+          </button>
+        </div>
+
+        {/* Tab 1: Mobile Saved Library (Editorial Digest List) */}
+        {mobileTab === 'library' && (
+          <div className="space-y-4 w-full min-w-0">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-4 bg-red-600 rounded-sm"></span>
+                <h3 className="font-extrabold text-sm uppercase tracking-wider font-mono text-foreground">
+                  Saved Library ({bookmarks.length})
+                </h3>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+              </div>
+            ) : bookmarks.length === 0 ? (
+              <div className="text-center py-12 px-4 border-2 border-dashed border-border/60 rounded-2xl bg-muted/20">
+                <Bookmark className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+                <h3 className="text-base font-bold mb-1 text-foreground">Your library is empty</h3>
+                <p className="text-muted-foreground text-xs max-w-xs mx-auto leading-relaxed">
+                  Save breaking articles, video broadcasts, and photo galleries while exploring to build your personal reading list.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 w-full min-w-0">
+                {bookmarks.map(item => (
+                  <Link
+                    key={item._id}
+                    to={
+                      item.type === 'article' ? `?articleId=${item.slug || item._id}` :
+                      item.type === 'video' ? `?videoId=${item._id}` :
+                      `?galleryId=${item._id}`
+                    }
+                    className="flex gap-3.5 p-3 rounded-2xl bg-card border border-border/60 shadow-sm hover:border-border active:scale-[0.99] transition-all w-full min-w-0"
+                  >
+                    <div className="relative w-24 h-24 shrink-0 rounded-xl bg-muted overflow-hidden border border-border/40">
+                      {item.thumbnail ? (
+                        <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          {item.type === 'video' ? <PlaySquare className="w-6 h-6 text-muted-foreground/40" /> : <FileText className="w-6 h-6 text-muted-foreground/40" />}
+                        </div>
+                      )}
+                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/75 text-white font-mono font-black text-[9px] uppercase tracking-wider">
+                        {item.type}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono font-black uppercase tracking-wider text-red-600 dark:text-red-400 block mb-1 truncate">
+                          {item.category || 'News'}
+                        </span>
+                        <h4 className="font-serif font-black text-sm sm:text-base leading-snug text-foreground line-clamp-2">
+                          {item.title}
+                        </h4>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mt-2">
+                        <span>Saved {new Date(item.createdAt).toLocaleDateString()}</span>
+                        <span className="text-red-600 font-extrabold">Open →</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Mobile Profile Settings (Touch Cards) */}
+        {mobileTab === 'settings' && (
+          <div className="space-y-6 w-full min-w-0">
+            {/* Avatar Studio Card */}
+            <div className="bg-card border border-border/70 rounded-3xl p-5 shadow-sm">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider font-mono text-muted-foreground mb-4 flex items-center gap-2">
+                <Camera className="w-4 h-4 text-red-600" /> Avatar Studio
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-red-500/30 shrink-0 bg-muted flex items-center justify-center">
+                  {editForm.profilePicture ? (
+                    <img src={editForm.profilePicture} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserCircle className="w-10 h-10 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center rounded-xl font-extrabold text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    <Camera className="w-3.5 h-3.5 mr-1.5 text-red-500" />
+                    {uploadingImage ? 'Uploading...' : 'Upload New Photo'}
+                  </Button>
+                  {editForm.profilePicture && (
+                    <Button 
+                      type="button" 
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-center rounded-xl text-destructive hover:bg-destructive/10 font-bold text-xs"
+                      onClick={() => setEditForm(prev => ({ ...prev, profilePicture: '' }))}
+                    >
+                      Remove Photo
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Personal Identity Card */}
+            <div className="bg-card border border-border/70 rounded-3xl p-5 shadow-sm space-y-4">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider font-mono text-muted-foreground flex items-center gap-2">
+                <UserCircle className="w-4 h-4 text-red-600" /> Personal Identity
+              </h3>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground">Full Name</label>
+                <Input value={editForm.fullName} onChange={(e) => setEditForm({...editForm, fullName: e.target.value})} className="rounded-xl h-11" />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex flex-col">
+                  <label className="text-xs font-extrabold uppercase font-mono text-foreground">Username</label>
+                  <span className={`text-[11px] mt-0.5 ${usernameStatus?.color || 'text-muted-foreground'}`}>
+                    • {usernameStatus?.text || 'Changeable once every 14 days'}
+                  </span>
+                </div>
+                <Input 
+                  value={editForm.username} 
+                  onChange={(e) => setEditForm({...editForm, username: e.target.value})}
+                  className={`rounded-xl h-11 ${!usernameStatus?.canChange && editForm.username !== user?.username ? "border-amber-500 ring-1 ring-amber-500/30" : ""}`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground">Bio</label>
+                <Textarea value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} placeholder="Tell readers about yourself..." className="rounded-xl h-24 text-sm" />
+              </div>
+            </div>
+
+            {/* Contact & Web Presence Card */}
+            <div className="bg-card border border-border/70 rounded-3xl p-5 shadow-sm space-y-4">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider font-mono text-muted-foreground flex items-center gap-2">
+                <Globe className="w-4 h-4 text-red-600" /> Contact & Web Presence
+              </h3>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground">Mobile Number</label>
+                <Input value={editForm.mobileNumber} onChange={(e) => setEditForm({...editForm, mobileNumber: e.target.value})} placeholder="+1 234 567 890" className="rounded-xl h-11" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground">Location</label>
+                <Input value={editForm.location} onChange={(e) => setEditForm({...editForm, location: e.target.value})} placeholder="City, Country" className="rounded-xl h-11" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground flex items-center gap-1.5"><Twitter className="w-3.5 h-3.5 text-blue-400" /> Twitter URL</label>
+                <Input value={editForm.twitter} onChange={(e) => setEditForm({...editForm, twitter: e.target.value})} placeholder="https://twitter.com/..." className="rounded-xl h-11" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground flex items-center gap-1.5"><Linkedin className="w-3.5 h-3.5 text-blue-700" /> LinkedIn URL</label>
+                <Input value={editForm.linkedin} onChange={(e) => setEditForm({...editForm, linkedin: e.target.value})} placeholder="https://linkedin.com/in/..." className="rounded-xl h-11" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold uppercase font-mono text-foreground flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-slate-500" /> Personal Website</label>
+                <Input value={editForm.website} onChange={(e) => setEditForm({...editForm, website: e.target.value})} placeholder="https://..." className="rounded-xl h-11" />
+              </div>
+            </div>
+
+            {/* Sticky Save Actions on Mobile */}
+            <div className="pt-2 sticky bottom-4 z-20">
+              <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md p-3 rounded-2xl border border-border shadow-2xl">
+                <Button variant="outline" className="flex-1 rounded-xl h-11 font-extrabold text-xs uppercase" onClick={() => setMobileTab('library')}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 rounded-xl h-11 font-extrabold text-xs uppercase bg-red-600 hover:bg-red-700 text-white shadow-md" 
+                  onClick={handleUpdateProfile} 
+                  disabled={updating}
+                >
+                  {updating ? 'Saving...' : <><Check className="w-4 h-4 mr-1.5" /> Save Changes</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Tab 4: Workspace & Admin Tools */}
+        {mobileTab === 'workspace' && (
+          <div className="space-y-6 w-full min-w-0">
+            {/* Public Page Action Card */}
+            <div className="bg-card border border-border/70 rounded-3xl p-5 shadow-sm flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h4 className="font-extrabold text-sm sm:text-base text-foreground font-serif">Public Author Profile</h4>
+                <p className="text-xs text-muted-foreground">Preview how other readers and reporters see your profile page.</p>
+              </div>
+              <Link to={`/user/${user._id}`}>
+                <Button size="sm" className="rounded-xl font-extrabold text-xs font-mono bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+                  <Globe className="w-3.5 h-3.5 mr-1.5" /> View Public
+                </Button>
+              </Link>
+            </div>
+
+            {/* Creator Workspace Card */}
+            <div className="bg-card border border-border/70 rounded-3xl p-5 shadow-sm space-y-3">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider font-mono text-muted-foreground flex items-center gap-2">
+                <FileEdit className="w-4 h-4 text-primary" /> Creator Workspace & Dashboards
+              </h3>
+              
+              {!userRoles.length && !user?.canManageLiveBlogs ? (
+                <div className="space-y-4">
+                  <div className="text-center py-6 px-3 bg-muted/20 rounded-2xl border border-dashed border-border/60">
+                    <ShieldCheck className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-foreground mb-1">Community Member</p>
+                    <p className="text-[11px] text-muted-foreground max-w-xs mx-auto leading-relaxed mb-4">
+                      Interested in publishing news stories and live blogs? Apply to join our verified reporting team.
+                    </p>
+                    <Link to="/apply-reporter">
+                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl">
+                        <FileText className="w-3.5 h-3.5 mr-1.5" /> Apply to Become a Reporter
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5 pt-1">
+                  {userRoles.some(r => ['reporter', 'admin', 'editor'].includes(r)) && (
+                    <Link to="/reporter/dashboard" className="block w-full">
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/40 hover:bg-muted/70 border border-border/50 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <FileEdit className="w-4 h-4" />
+                          </div>
+                          <span className="font-extrabold text-sm text-foreground">Reporter Articles</span>
+                        </div>
+                        <span className="text-primary font-mono text-xs font-extrabold">Open →</span>
+                      </div>
+                    </Link>
+                  )}
+                  {userRoles.some(r => ['editor', 'admin'].includes(r)) && (
+                    <Link to="/editor/dashboard" className="block w-full">
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/40 hover:bg-muted/70 border border-border/50 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <span className="font-extrabold text-sm text-foreground">Editor Dashboard</span>
+                        </div>
+                        <span className="text-purple-600 dark:text-purple-400 font-mono text-xs font-extrabold">Open →</span>
+                      </div>
+                    </Link>
+                  )}
+                  {(userRoles.some(r => ['admin', 'editor'].includes(r)) || (userRoles.includes('reporter') && user?.canManageLiveBlogs)) && (
+                    <Link to="/live-blog-studio" className="block w-full">
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/30 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <Radio className="w-4 h-4 animate-pulse" />
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-sm text-red-600 dark:text-red-400 block">Live Blog Studio</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">Broadcast live updates</span>
+                          </div>
+                        </div>
+                        <span className="text-red-600 dark:text-red-400 font-mono text-xs font-extrabold">Studio →</span>
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Sign Out Navigatable Card */}
+            <div className="pt-2">
+              <div 
+                onClick={handleLogout}
+                role="button"
+                className="flex items-center justify-between p-4 rounded-3xl bg-card border border-rose-500/40 hover:bg-rose-500/10 shadow-sm cursor-pointer transition-all group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+                    <LogOut className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm text-foreground block group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">Sign Out of Account</span>
+                    <span className="text-[11px] text-muted-foreground block font-sans">End active session & securely disconnect</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-mono text-xs font-black shadow-sm transition-colors">
+                  Log Out →
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===================================================================================
+          DESKTOP VIEW (hidden sm:block)
+          =================================================================================== */}
+      <div className="hidden sm:block w-full max-w-full min-w-0">
+        {/* Premium Cover Header */}
+        <div className="h-48 md:h-64 w-full bg-gradient-to-r from-slate-900 via-red-900 to-slate-900 relative rounded-b-[2.5rem] md:rounded-b-[4rem] shadow-lg mb-16 md:mb-20 overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
         {!isEditing ? (
           <Button 
@@ -235,7 +656,7 @@ export default function Profile() {
               
               <h1 className="text-3xl font-bold font-serif mb-1 text-foreground">{user.fullName}</h1>
               <p className="text-muted-foreground font-medium text-sm mb-1">
-                @{user.username || user.fullName.toLowerCase().replace(/\s+/g, '')}
+                @{user.username || (user.fullName || '').toLowerCase().replace(/\s+/g, '')}
               </p>
               <p className="text-muted-foreground mb-4 text-sm">{user.email}</p>
 
@@ -247,19 +668,6 @@ export default function Profile() {
               
               {/* Badges */}
               <div className="flex flex-col gap-3">
-                {user.isPremium && (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className="inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 text-yellow-800 dark:text-yellow-500 px-4 py-2 rounded-xl text-sm font-bold border border-yellow-200 dark:border-yellow-900/50 shadow-sm">
-                      <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" /> Premium Member
-                    </div>
-                    {user.subscriptionExpiry && (
-                      <span className="text-[11px] font-bold tracking-wide uppercase text-yellow-600 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-full border border-yellow-100 dark:border-yellow-900/50">
-                        {calculateDaysLeft(user.subscriptionExpiry)} days remaining
-                      </span>
-                    )}
-                  </div>
-                )}
-                
                 {userRoles.some(r => ['admin'].includes(r)) && (
                   <div className="inline-flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-4 py-2 rounded-xl text-sm font-bold border border-red-200 dark:border-red-900/30">
                     System Administrator
@@ -338,46 +746,36 @@ export default function Profile() {
                   </div>
                 )}
 
-                {/* Account & Membership Plan */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block text-left px-1">Account & Plan</span>
-                  <div className="flex flex-col gap-2">
-                    {!user.isPremium ? (
-                      <Link to="/subscriptions" className="w-full">
-                        <Button className="w-full justify-start h-11 rounded-xl bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 text-white shadow-md text-sm font-semibold border-0 transition-all">
-                          <Star className="w-4 h-4 mr-3 fill-white shrink-0" />
-                          Upgrade to Premium
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Link to="/subscriptions" className="w-full">
-                        <Button variant="outline" className="w-full justify-start h-11 rounded-xl hover:bg-yellow-500/5 hover:border-yellow-500/30 text-sm font-medium border-border/80 transition-all">
-                          <Star className="w-4 h-4 mr-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                          Manage Subscription
-                        </Button>
-                      </Link>
-                    )}
-                    {user.isPremium && !userRoles.includes('reporter') && !userRoles.includes('admin') && (
+                {/* Account & Role */}
+                {!userRoles.includes('reporter') && !userRoles.includes('admin') && !userRoles.includes('editor') && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block text-left px-1">Reporter Access</span>
+                    <div className="flex flex-col gap-2">
                       <Link to="/apply-reporter" className="w-full">
                         <Button variant="outline" className="w-full justify-start h-11 rounded-xl hover:bg-blue-500/5 hover:border-blue-500/30 text-blue-600 dark:text-blue-400 text-sm font-medium border-border/80 transition-all">
                           <FileText className="w-4 h-4 mr-3 shrink-0" />
                           Apply for Reporter
                         </Button>
                       </Link>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Sign Out Action */}
-                <div className="pt-2 mt-1 border-t border-border/40">
-                  <Button 
-                    variant="ghost" 
-                    onClick={handleLogout} 
-                    className="w-full justify-start h-11 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive font-medium text-sm transition-colors"
+                {/* Sign Out Navigatable Action Card */}
+                <div className="pt-2 mt-2 border-t border-border/40">
+                  <div 
+                    onClick={handleLogout}
+                    role="button"
+                    className="flex items-center justify-between p-3 rounded-2xl bg-rose-500/5 hover:bg-rose-500/15 border border-rose-500/30 cursor-pointer transition-all group"
                   >
-                    <LogOut className="w-4 h-4 mr-3 shrink-0" />
-                    Sign Out
-                  </Button>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <span className="font-extrabold text-sm text-foreground group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">Sign Out</span>
+                    </div>
+                    <span className="text-rose-600 dark:text-rose-400 font-mono text-xs font-extrabold">Disconnect →</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -593,6 +991,7 @@ export default function Profile() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

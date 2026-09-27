@@ -78,20 +78,20 @@ export default function ContentManagement() {
   const handleEditSave = async (e) => {
     e.preventDefault();
     try {
-      const { _id, type, title, content: itemContent, description, category, videoUrl, commentSettings } = editItem;
+      const { _id, type, title, content: itemContent, description, category, videoUrl, commentSettings, tags } = editItem;
       
       let payload = {};
       let endpoint = '';
       
       if (type === 'article') {
         endpoint = `/news/${_id}`;
-        payload = { title, content: itemContent, category, commentSettings };
+        payload = { title, content: itemContent, category, commentSettings, tags };
       } else if (type === 'gallery') {
         endpoint = `/photo-galleries/${_id}`;
-        payload = { title, description, category, commentSettings };
+        payload = { title, description, category, commentSettings, tags };
       } else if (type === 'video') {
         endpoint = `/videos/${_id}`;
-        payload = { title, description, category, videoUrl, commentSettings };
+        payload = { title, description, category, videoUrl, commentSettings, tags };
       }
 
       const res = await api.put(endpoint, payload);
@@ -289,6 +289,17 @@ export default function ContentManagement() {
                   onChange={e => setEditItem({...editItem, category: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all capitalize"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tags (comma separated)</label>
+                <input 
+                  type="text" 
+                  value={Array.isArray(editItem.tags) ? editItem.tags.join(', ') : (editItem.tags || '')} 
+                  onChange={e => setEditItem({...editItem, tags: e.target.value})}
+                  className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
+                  placeholder="e.g. cricket, world cup, sports"
                 />
               </div>
 

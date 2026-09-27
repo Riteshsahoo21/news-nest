@@ -18,7 +18,6 @@ const PhotoGalleryDetail = () => {
   const { user } = useAuth();
   const isStaff = user?.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
   const isAdmin = user?.roles?.includes('admin');
-  const isAdFree = user?.isPremium || isStaff;
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialType, setInterstitialType] = useState('interstitial');
   const [countdown, setCountdown] = useState(5);
@@ -61,17 +60,18 @@ const PhotoGalleryDetail = () => {
           setGallery(response.data.gallery);
           setComments(response.data.comments || []);
           
-          if (!isAdFree) {
+          // Only staff preview custom interstitials
+          if (isStaff) {
             let readArticles = [];
             try {
-              readArticles = JSON.parse(sessionStorage.getItem('free_articles_read_list')) || [];
+              readArticles = JSON.parse(sessionStorage.getItem('staff_gallery_read_list')) || [];
             } catch (e) {
               readArticles = [];
             }
             
             if (!readArticles.includes(id)) {
               readArticles.push(id);
-              sessionStorage.setItem('free_articles_read_list', JSON.stringify(readArticles));
+              sessionStorage.setItem('staff_gallery_read_list', JSON.stringify(readArticles));
             }
             
             let readCount = readArticles.length;
@@ -106,7 +106,7 @@ const PhotoGalleryDetail = () => {
         socket.disconnect();
       }
     };
-  }, [id, isAdFree]);
+  }, [id, isStaff]);
 
   useEffect(() => {
     let timer;
@@ -245,9 +245,6 @@ const PhotoGalleryDetail = () => {
           >
             {countdown > 0 ? `Skip Ad in ${countdown}s` : 'Skip Ad & View Gallery'}
           </button>
-          <a href="/subscriptions" className="text-red-600 font-medium hover:underline text-sm">
-            Remove Ads with Premium
-          </a>
         </div>
       </div>
     );

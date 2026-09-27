@@ -53,7 +53,7 @@ export default function CategoryPills({ categories, selectedCategory, onSelectCa
     : [{ _id: 'all', name: 'All' }, ...mergedCategories];
 
   return (
-    <div className="w-full relative group">
+    <div className="w-full max-w-full overflow-hidden min-w-0 relative group">
       {/* Left Scroll Gradient & Button */}
       <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 flex items-center justify-start pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
         <button 

@@ -5,6 +5,7 @@ import { Twitter, Linkedin } from '../components/BrandIcons';
 import api from '../services/api';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
+import SafeImage from '../components/common/SafeImage';
 
 export default function PublicProfile() {
   const { userId } = useParams();
@@ -125,7 +126,7 @@ export default function PublicProfile() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/60 rounded-full animate-pulse blur-md opacity-40"></div>
             <div className="relative w-full h-full bg-card rounded-full border-4 border-background flex items-center justify-center shadow-inner overflow-hidden">
               {profile.profilePicture && !profile.profilePicture.includes('ui-avatars') ? (
-                <img src={profile.profilePicture} alt={profile.fullName} className="w-full h-full object-cover" />
+                <img src={profile.profilePicture} alt={profile.fullName || 'User'} className="w-full h-full object-cover" />
               ) : (
                 <UserCircle className="w-24 h-24 text-muted-foreground" />
               )}
@@ -133,10 +134,10 @@ export default function PublicProfile() {
           </div>
           
           <h1 className="text-3xl md:text-4xl font-bold font-serif text-foreground tracking-tight">
-            {profile.fullName}
+            {profile.fullName || 'User'}
           </h1>
           <p className="text-muted-foreground font-medium mt-1 mb-2">
-            @{profile.username || profile.fullName.toLowerCase().replace(/\s+/g, '')}
+            @{profile.username || (profile.fullName || '').toLowerCase().replace(/\s+/g, '')}
           </p>
 
           {/* Social Stats and Follow Button */}
@@ -191,11 +192,6 @@ export default function PublicProfile() {
 
           {/* Badges */}
           <div className="flex flex-wrap justify-center gap-3 mb-8">
-            {profile.isPremium && (
-              <div className="inline-flex items-center justify-center gap-1.5 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
-                <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" /> Premium Member
-              </div>
-            )}
             {userRoles.includes('reporter') && !userRoles.some(r => ['admin', 'editor'].includes(r)) && (
               <div className="inline-flex items-center justify-center gap-1.5 bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold">
                 <FileEdit className="w-4 h-4" /> Official Reporter
@@ -236,8 +232,8 @@ export default function PublicProfile() {
 
         {/* Reporter's News Grid */}
         <div className="mt-12">
-          <h2 className="text-2xl font-bold font-serif mb-6 pl-2 border-l-4 border-primary">
-            Articles by {profile.fullName.split(' ')[0]}
+          <h2 className="text-2xl font-bold font-serif text-foreground mb-6">
+            Articles by {(profile.fullName || 'User').split(' ')[0]}
           </h2>
           
           {newsLoading ? (
@@ -261,14 +257,13 @@ export default function PublicProfile() {
                   className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-shadow"
                 >
                   <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden flex-shrink-0">
-                    <img 
-                      src={article.imageUrl && article.imageUrl !== 'null' ? article.imageUrl : 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop'} 
+                    <SafeImage 
+                      src={article.imageUrl || article.mainImageUrl} 
                       alt={article.title}
+                      category={article.category}
+                      subCategory={article.subCategory}
+                      country={article.country}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop';
-                      }}
                     />
                   </div>
                   <div className="p-4 flex flex-col flex-1">

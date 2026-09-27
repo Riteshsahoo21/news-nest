@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Search as SearchIcon, ArrowLeft, PlayCircle, Image as ImageIcon, FileText, Clock } from 'lucide-react';
+import { Search as SearchIcon, ArrowLeft, PlayCircle, Image as ImageIcon, FileText, Radio } from 'lucide-react';
 import api from '../services/api';
 import EditorsPick from '../components/home/EditorsPick';
 import { Input } from '../components/ui/input';
-import VideoModal from '../components/VideoModal';
+
+const EMPTY_RESULTS = { news: [], liveBlogs: [], videos: [], photoGalleries: [] };
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -12,35 +13,72 @@ export default function Search() {
   const navigate = useNavigate();
 
   const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState({ news: [], videos: [], photoGalleries: [] });
+  const [results, setResults] = useState(EMPTY_RESULTS);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const [newsPagination, setNewsPagination] = useState({ page: 1, hasMore: false, total: 0 });
   const [loading, setLoading] = useState(false);
+  const [refreshingLive, setRefreshingLive] = useState(false);
   const [error, setError] = useState('');
+  const latestRequestId = useRef(0);
+  const liveRefreshTimer = useRef(null);
+  const livePollCount = useRef(0);
   
-  // Video Modal State
-  const [selectedVideo, setSelectedVideo] = useState(null);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-
   useEffect(() => {
+    if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current);
+    livePollCount.current = 0;
+    setRefreshingLive(false);
     if (initialQuery) {
       setQuery(initialQuery);
-      fetchResults(initialQuery);
+      fetchResults(initialQuery, 1, false);
     } else {
-      setResults({ news: [], videos: [], photoGalleries: [] });
+      latestRequestId.current += 1;
+      setResults(EMPTY_RESULTS);
+      setTotalMatches(0);
+      setNewsPagination({ page: 1, hasMore: false, total: 0 });
     }
+
+    return () => {
+      if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current);
+    };
   }, [initialQuery]);
 
-  const fetchResults = async (searchQuery) => {
+  const scheduleLiveRefresh = (searchQuery, discovery) => {
+    if (discovery?.status !== 'running' || livePollCount.current >= 12) {
+      setRefreshingLive(false);
+      return;
+    }
+
+    setRefreshingLive(true);
+    if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current);
+    liveRefreshTimer.current = setTimeout(() => {
+      livePollCount.current += 1;
+      fetchResults(searchQuery, 1, false, true);
+    }, 2500);
+  };
+
+  const fetchResults = async (searchQuery, page = 1, append = false, background = false) => {
     if (!searchQuery.trim()) return;
+    const requestId = ++latestRequestId.current;
     try {
-      setLoading(true);
-      setError('');
-      const res = await api.get(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setResults(res.data.results || { news: [], videos: [], photoGalleries: [] });
+      if (!background) setLoading(true);
+      if (!background) setError('');
+      const res = await api.get('/search', { params: { q: searchQuery.trim(), page, limit: 24 } });
+      if (requestId !== latestRequestId.current) return;
+      const nextResults = { ...EMPTY_RESULTS, ...(res.data.results || {}) };
+      setResults((current) => append
+        ? { ...current, news: [...(current.news || []), ...(nextResults.news || [])] }
+        : nextResults
+      );
+      setTotalMatches(res.data.totalMatches || 0);
+      setNewsPagination(res.data.pagination?.news || { page, hasMore: false, total: nextResults.news.length });
+      if (page === 1) scheduleLiveRefresh(searchQuery, res.data.discovery);
     } catch (err) {
+      if (requestId !== latestRequestId.current) return;
       console.error('Search error:', err);
-      setError('Failed to fetch search results. Please try again.');
+      if (!background) setError('Failed to fetch search results. Please try again.');
+      setRefreshingLive(false);
     } finally {
-      setLoading(false);
+      if (!background && requestId === latestRequestId.current) setLoading(false);
     }
   };
 
@@ -52,11 +90,12 @@ export default function Search() {
   };
 
   const handleVideoClick = (video) => {
-    setSelectedVideo(video);
-    setIsVideoModalOpen(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('videoId', video._id);
+    navigate(`/search?${nextParams.toString()}`);
   };
 
-  const totalResults = (results.news?.length || 0) + (results.videos?.length || 0) + (results.photoGalleries?.length || 0);
+  const totalResults = totalMatches;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 mb-20 md:mb-0">
@@ -80,14 +119,22 @@ export default function Search() {
       </form>
 
       {loading && (
-        <div className="flex justify-center py-10">
+        <div className="flex flex-col items-center justify-center gap-3 py-10 text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-sm">Searching saved articles...</p>
         </div>
       )}
 
       {error && (
         <div className="bg-destructive/10 text-destructive p-4 rounded-xl text-center">
           {error}
+        </div>
+      )}
+
+      {refreshingLive && !loading && (
+        <div className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-muted-foreground" role="status">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+          Saved results are ready. Checking live publishers for newer matches…
         </div>
       )}
 
@@ -108,7 +155,30 @@ export default function Search() {
                     <h2 className="text-xl font-bold">News Articles ({results.news.length})</h2>
                   </div>
                   <div className="bg-card rounded-2xl border border-border p-4 shadow-sm">
-                    <EditorsPick articles={results.news} showSnippet={true} />
+                    <EditorsPick articles={results.news} showSnippet={true} variant="grid-3" />
+                  </div>
+                </section>
+              )}
+
+              {/* Live Blogs Section */}
+              {results.liveBlogs && results.liveBlogs.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                    <Radio className="text-red-600 w-6 h-6" />
+                    <h2 className="text-xl font-bold">Live Coverage ({results.liveBlogs.length})</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {results.liveBlogs.map((blog) => (
+                      <Link
+                        key={blog._id}
+                        to={`/live-blogs?id=${blog._id}`}
+                        className="block rounded-xl border border-border bg-card p-5 hover:border-red-500/50 hover:shadow-md transition-all"
+                      >
+                        <span className="text-xs font-bold uppercase tracking-wider text-red-600">{blog.category || 'Live'}</span>
+                        <h3 className="font-bold mt-2 line-clamp-2">{blog.title}</h3>
+                        {blog.description && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{blog.description}</p>}
+                      </Link>
+                    ))}
                   </div>
                 </section>
               )}
@@ -171,9 +241,9 @@ export default function Search() {
                         className="group block bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all"
                       >
                         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                          {gallery.images && gallery.images.length > 0 ? (
+                          {(gallery.photos || gallery.images)?.length > 0 ? (
                             <img 
-                              src={gallery.images[0].url} 
+                              src={(gallery.photos || gallery.images)[0].url} 
                               alt={gallery.title} 
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
@@ -184,7 +254,7 @@ export default function Search() {
                           )}
                           <div className="absolute top-2 right-2 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 backdrop-blur-sm">
                             <ImageIcon className="w-3 h-3" />
-                            {gallery.images?.length || 0} Photos
+                            {gallery.photos?.length || gallery.images?.length || 0} Photos
                           </div>
                         </div>
                         <div className="p-4">
@@ -207,19 +277,26 @@ export default function Search() {
               <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-2">No results found</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                We couldn't find any articles, videos, or galleries matching your search terms. Try using different keywords.
+                {refreshingLive
+                  ? 'No saved matches yet. Live publishers are being checked now.'
+                  : "We couldn't find any articles, videos, or galleries matching your search terms. Try using different keywords."}
               </p>
             </div>
           )}
         </div>
       )}
 
-      {/* Video Modal */}
-      <VideoModal 
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        video={selectedVideo}
-      />
+      {!loading && initialQuery && newsPagination.hasMore && (
+        <div className="flex justify-center mt-10">
+          <button
+            type="button"
+            onClick={() => fetchResults(initialQuery, newsPagination.page + 1, true)}
+            className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+          >
+            Load more news ({results.news.length} of {newsPagination.total})
+          </button>
+        </div>
+      )}
     </div>
   );
 }

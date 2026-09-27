@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Image as ImageIcon, Camera } from 'lucide-react';
+import { Camera, Share2, Check } from 'lucide-react';
 import api from '../services/api';
 
 export default function PhotoGallery() {
   const [galleries, setGalleries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     const fetchGalleries = async () => {
@@ -22,73 +23,120 @@ export default function PhotoGallery() {
     fetchGalleries();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
-    );
-  }
+  const handleShare = async (e, gallery) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const url = `${window.location.origin}/photo-gallery?galleryId=${gallery._id}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: gallery.title,
+          text: gallery.description,
+          url: url,
+        });
+      } catch (err) {
+        console.log('Error sharing:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      setCopiedId(gallery._id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
 
   return (
-    <div className="max-w-[1640px] mx-auto px-4 sm:px-6 md:px-10 xl:px-12 py-8 bg-background">
-      <div className="flex items-center space-x-3 mb-8">
-        <ImageIcon className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold">Photo Galleries</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 bg-background min-h-screen">
+      
+      {/* Professional Header */}
+      <div className="mb-10 border-b border-border/60 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-black font-serif text-foreground tracking-tight">
+            In Pictures
+          </h1>
+          <p className="text-muted-foreground mt-3 font-sans text-lg font-medium max-w-2xl">
+            Visual storytelling and photojournalism from around the world.
+          </p>
+        </div>
       </div>
 
-      {galleries.length === 0 ? (
-        <div className="text-center py-20 border border-dashed rounded-xl text-muted-foreground">
-          <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No photo galleries available at the moment.</p>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="animate-pulse flex flex-col border border-border">
+              <div className="aspect-[3/2] bg-muted w-full"></div>
+              <div className="p-4 flex-1 flex flex-col gap-3">
+                <div className="h-6 bg-muted w-3/4"></div>
+                <div className="h-4 bg-muted w-full"></div>
+                <div className="h-4 bg-muted w-5/6"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : galleries.length === 0 ? (
+        <div className="text-center py-20 border border-border bg-muted/10">
+          <Camera className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-lg font-serif text-foreground">No photo galleries available at this time.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
           {galleries.map((gallery) => (
             <Link 
               key={gallery._id} 
               to={`?galleryId=${gallery._id}`}
-              className="group flex flex-col bg-card rounded-2xl overflow-hidden shadow-sm border border-border hover:shadow-xl hover:border-primary/30 transition-all duration-300 h-full"
+              className="group flex flex-col h-full cursor-pointer"
             >
-              <div className="relative aspect-video bg-muted overflow-hidden shrink-0">
+              <div className="relative aspect-[3/2] w-full bg-muted overflow-hidden mb-4 border border-border/50">
                 {gallery.photos && gallery.photos.length > 0 ? (
                   <img 
                     src={gallery.photos[0].url} 
                     alt={gallery.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800">
-                    <ImageIcon className="w-10 h-10 text-gray-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                    <Camera className="w-8 h-8 text-gray-400" />
                   </div>
                 )}
                 
-                <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                  {gallery.category}
+                {/* Category tag */}
+                <div className="absolute top-0 left-0 bg-red-700 text-white text-[11px] font-bold px-3 py-1 uppercase tracking-widest">
+                  {gallery.category || 'Gallery'}
                 </div>
                 
-                <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-lg text-white text-xs font-semibold flex items-center shadow-md">
-                  <ImageIcon className="w-3.5 h-3.5 mr-1.5 text-primary" />
-                  {gallery.photos?.length || 0} Photos
+                {/* Photo Count indicator */}
+                <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2 py-1 text-white text-[11px] font-semibold flex items-center">
+                  <Camera className="w-3 h-3 mr-1.5" />
+                  {gallery.photos?.length || 0}
                 </div>
               </div>
               
-              <div className="p-5 flex flex-col flex-1 justify-between">
-                <div>
-                  <h3 className="font-bold text-lg md:text-xl mb-2.5 line-clamp-2 group-hover:text-primary transition-colors text-foreground font-serif leading-snug">
-                    {gallery.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                    {gallery.description}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 mt-4 border-t border-border/60 font-medium">
-                  <span className="font-semibold text-primary truncate max-w-[60%]">
-                    By {gallery.photographer || 'Anonymous'}
-                  </span>
-                  <span className="shrink-0 text-foreground/70">
-                    {new Date(gallery.createdAt).toLocaleDateString()}
-                  </span>
+              <div className="flex flex-col flex-1">
+                <h3 className="font-bold text-xl mb-2 line-clamp-3 text-foreground font-serif leading-snug group-hover:text-red-700 transition-colors">
+                  {gallery.title}
+                </h3>
+                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed font-serif mb-4 flex-1">
+                  {gallery.description}
+                </p>
+                
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground font-semibold border-t border-border/60 pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate max-w-[120px]">
+                      By {gallery.photographer || 'News Desk'}
+                    </span>
+                    <span className="text-border">•</span>
+                    <span>{new Date(gallery.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric'})}</span>
+                  </div>
+                  
+                  {/* Share Button */}
+                  <button 
+                    onClick={(e) => handleShare(e, gallery)}
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    title="Share Gallery"
+                  >
+                    {copiedId === gallery._id ? <Check className="w-4 h-4 text-green-600" /> : <Share2 className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             </Link>

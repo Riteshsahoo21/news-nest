@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../services/api';
+import SafeImage from '../components/common/SafeImage';
 
 export default function CategoryNews() {
   const { categoryId } = useParams();
@@ -75,16 +76,64 @@ export default function CategoryNews() {
                 }}
                 className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-shadow"
               >
-                <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden flex-shrink-0">
-                  <img 
-                    src={article.imageUrl && article.imageUrl !== 'null' ? article.imageUrl : 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop'} 
-                    alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&h=400&fit=crop';
-                    }}
-                  />
+                <div className="relative w-full aspect-[16/10] max-h-[145px] sm:max-h-none bg-muted overflow-hidden shrink-0">
+                  {article.mediaUrls && article.mediaUrls.length > 1 ? (
+                    <div className="w-full h-full flex overflow-hidden">
+                      <SafeImage 
+                        src={article.mediaUrls[0]} 
+                        alt={article.title} 
+                        category={article.category || categoryName}
+                        subCategory={article.subCategory}
+                        country={article.country}
+                        className="w-1/2 h-full object-cover pr-[1px] transition-transform duration-300 group-hover:scale-105"
+                      />
+                      {article.mediaUrls.length > 2 ? (
+                        <div className="w-1/2 h-full flex flex-col pl-[1px] overflow-hidden">
+                          <SafeImage 
+                            src={article.mediaUrls[1]} 
+                            alt={article.title}
+                            category={article.category || categoryName}
+                            subCategory={article.subCategory}
+                            country={article.country}
+                            className="w-full h-1/2 object-cover pb-[1px] transition-transform duration-300 group-hover:scale-105" 
+                          />
+                          <div className="relative w-full h-1/2 pt-[1px] overflow-hidden">
+                            <SafeImage 
+                              src={article.mediaUrls[2]} 
+                              alt={article.title}
+                              category={article.category || categoryName}
+                              subCategory={article.subCategory}
+                              country={article.country}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                            />
+                            {article.mediaUrls.length > 3 && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-xs pointer-events-none mt-[1px]">
+                                +{article.mediaUrls.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <SafeImage 
+                          src={article.mediaUrls[1]} 
+                          alt={article.title} 
+                          category={article.category || categoryName}
+                          subCategory={article.subCategory}
+                          country={article.country}
+                          className="w-1/2 h-full object-cover pl-[1px] transition-transform duration-300 group-hover:scale-105"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <SafeImage 
+                      src={article.imageUrl || article.mainImageUrl} 
+                      alt={article.title}
+                      category={article.category || categoryName}
+                      subCategory={article.subCategory}
+                      country={article.country}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  )}
                 </div>
                 <div className="p-4 flex flex-col flex-1">
                   <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block mb-1">

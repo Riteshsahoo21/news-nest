@@ -7,9 +7,19 @@ const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
+const isServer = typeof window === 'undefined';
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    if (isServer) return null;
+    const storedUser = localStorage.getItem('user');
+    try {
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchLatestUser = async (token, storedUserStr) => {
@@ -22,10 +32,9 @@ export const AuthProvider = ({ children }) => {
         return latestUser;
       } catch (e) {
         console.error("Failed to fetch latest user", e);
-        if (e.response && e.response.status === 401) {
+        if (e.response && (e.response.status === 401 || e.response.status === 403)) {
           logout();
         }
-        throw e;
       }
     };
 
@@ -34,14 +43,13 @@ export const AuthProvider = ({ children }) => {
       const storedUser = localStorage.getItem('user');
 
       if (token && storedUser) {
-        // Temporarily set stored user so UI doesn't block while fetching latest
-        setUser(JSON.parse(storedUser));
         await fetchLatestUser(token, storedUser).catch(() => {});
       }
-      setLoading(false);
     };
 
-    initializeAuth();
+    if (!isServer) {
+      initializeAuth();
+    }
   }, []);
 
   const refreshUser = async () => {
@@ -134,10 +142,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const sendRegistrationOTP = async (userData) => {
+    const response = await api.post('/auth/send-otp', userData);
+    return response.data;
+  };
+
   const value = {
     user,
     login,
     loginWithGoogle,
+    sendRegistrationOTP,
     register,
     logout,
     refreshUser,

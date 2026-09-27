@@ -6,7 +6,7 @@ import {
   AlertTriangle, Info, Clock, MapPin, Monitor, Key, FileJson, 
   ChevronLeft, ChevronRight, Activity, Layers, FileText, Users, 
   DollarSign, MessageSquare, Settings, Globe, Smartphone, Laptop, 
-  Sparkles, Database, ShieldCheck, Filter, ArrowUpRight
+  Sparkles, Database, ShieldCheck, Filter, ArrowUpRight, Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
@@ -28,7 +28,6 @@ export default function AuditLogs() {
   
   // Drawer state
   const [selectedLog, setSelectedLog] = useState(null);
-  const [drawerTab, setDrawerTab] = useState('summary'); // 'summary' or 'raw'
   const autoRefreshIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -171,24 +170,17 @@ export default function AuditLogs() {
     document.body.removeChild(link);
   };
 
-  const getSeverityBadge = (sev) => {
-    switch (sev) {
-      case 'critical': 
-        return <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30 flex items-center gap-1 w-fit"><ShieldAlert className="w-3.5 h-3.5 text-red-500"/> Critical</span>;
-      case 'warning': 
-        return <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 w-fit"><AlertTriangle className="w-3.5 h-3.5 text-amber-500"/> Warning</span>;
-      default: 
-        return <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 flex items-center gap-1 w-fit"><Info className="w-3.5 h-3.5 text-slate-400"/> Info</span>;
+  const getSeverityBadge = (sev, status) => {
+    if (status >= 400 || sev === 'critical') {
+      return <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30 flex items-center gap-1 w-fit"><ShieldAlert className="w-3.5 h-3.5 text-red-500"/> Action Required</span>;
     }
+    if (sev === 'warning') {
+      return <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 w-fit"><AlertTriangle className="w-3.5 h-3.5 text-amber-500"/> Warning</span>;
+    }
+    return <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500"/> Success</span>;
   };
 
-  const getStatusBadge = (status) => {
-    if (status < 400) {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500"/> {status} OK</span>;
-    } else {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 w-fit"><X className="w-3.5 h-3.5 text-rose-500"/> {status} ERR</span>;
-    }
-  };
+  // Status badge removed to merge with severity
 
   const getModuleBadge = (mod) => {
     switch (mod) {
@@ -287,58 +279,132 @@ export default function AuditLogs() {
       </div>
 
       {/* KPI Dashboard */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Recorded Events</CardTitle>
-            <Database className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold tracking-tight">{stats.total ? stats.total.toLocaleString() : '0'}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-emerald-500" /> Lifetime audit trajectory
-            </p>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        {/* Growth & Revenue */}
+        <div>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-500"/> Growth & Revenue</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">New Registrations</CardTitle>
+                <Users className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.newRegistrations || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Premium Upgrades</CardTitle>
+                <Sparkles className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.subscriptionUpgrades || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Successful Payments</CardTitle>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">{stats.metrics?.paymentSuccess || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Failed Transactions</CardTitle>
+                <ShieldAlert className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-extrabold tracking-tight ${stats.metrics?.paymentFailed > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                  {stats.metrics?.paymentFailed || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Today's Activity</CardTitle>
-            <Activity className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
-              {stats.todayCount !== undefined ? stats.todayCount.toLocaleString() : '—'}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Actions logged since midnight</p>
-          </CardContent>
-        </Card>
+        {/* Content & Community */}
+        <div>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2"><FileText className="w-4 h-4 text-purple-500"/> Content & Community</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Published Content</CardTitle>
+                <FileText className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.contentPublished || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Deleted Content</CardTitle>
+                <Trash2 className="h-4 w-4 text-rose-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.contentDeleted || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Comments Moderated</CardTitle>
+                <MessageSquare className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.commentsModerated || 0}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Successful Execution</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold tracking-tight text-blue-600 dark:text-blue-400">
-              {stats.total > 0 ? `${((stats.successful / stats.total) * 100).toFixed(1)}%` : '100%'}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.successful?.toLocaleString()} verified OK transactions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Security Alerts</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-extrabold tracking-tight ${(stats.critical > 0 || stats.failed > 0) ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
-              {(stats.failed || 0) + (stats.critical || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.critical || 0} critical anomalies detected</p>
-          </CardContent>
-        </Card>
+        {/* Security & Access */}
+        <div>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-blue-500"/> Security & Access</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Successful Logins</CardTitle>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.successfulLogins || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Failed Logins</CardTitle>
+                <ShieldAlert className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-extrabold tracking-tight ${stats.metrics?.failedLogins > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                  {stats.metrics?.failedLogins || 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Role & Permission Changes</CardTitle>
+                <Key className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold tracking-tight">{stats.metrics?.roleChanges || 0}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/60 shadow-sm bg-gradient-to-br from-background to-muted/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Security Anomalies</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-extrabold tracking-tight ${stats.metrics?.securityAlerts > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                  {stats.metrics?.securityAlerts || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Module Filter Tabs Bar */}
@@ -347,10 +413,10 @@ export default function AuditLogs() {
           { id: 'all', label: 'All Domains', icon: Layers },
           { id: 'Content', label: 'Editorial Content', icon: FileText },
           { id: 'Users & Access', label: 'Users & Roles', icon: Users },
-          { id: 'Authentication', label: 'Authentication', icon: Key },
-          { id: 'Monetization', label: 'Monetization', icon: DollarSign },
+          { id: 'Authentication', label: 'Logins & Security', icon: Key },
+          { id: 'Monetization', label: 'Payments & Subscriptions', icon: DollarSign },
           { id: 'Community', label: 'Community & Comments', icon: MessageSquare },
-          { id: 'System', label: 'System Settings', icon: Settings },
+          { id: 'System', label: 'Settings', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = moduleCategory === tab.id;
@@ -462,7 +528,6 @@ export default function AuditLogs() {
                 <th className="px-6 py-3.5">Performed By</th>
                 <th className="px-6 py-3.5">Origin & Device</th>
                 <th className="px-6 py-3.5">Severity</th>
-                <th className="px-6 py-3.5">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -564,7 +629,6 @@ export default function AuditLogs() {
                         <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                           <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                           <span>{log.location || 'Local / Intranet'}</span>
-                          <span className="text-muted-foreground text-[11px] font-mono">({log.ipAddress})</span>
                         </div>
                         <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                           {deviceLabel.includes('Mobile') || deviceLabel.includes('iPhone') ? (
@@ -577,11 +641,7 @@ export default function AuditLogs() {
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getSeverityBadge(log.severity)}
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(log.status)}
+                        {getSeverityBadge(log.severity, log.status)}
                       </td>
                     </tr>
                   );
@@ -643,8 +703,7 @@ export default function AuditLogs() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     {getModuleBadge(getLogModule(selectedLog))}
-                    {getSeverityBadge(selectedLog.severity)}
-                    {getStatusBadge(selectedLog.status)}
+                    {getSeverityBadge(selectedLog.severity, selectedLog.status)}
                   </div>
                   <h2 className="text-xl font-extrabold tracking-tight mt-1 text-foreground">
                     {selectedLog.readableAction || 'System Request Details'}
@@ -685,10 +744,7 @@ export default function AuditLogs() {
                     </div>
                   </div>
                   <div className="font-mono text-xs bg-background p-2.5 rounded-lg border flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded font-extrabold text-[11px] bg-primary/10 text-primary border border-primary/20">
-                      {selectedLog.method}
-                    </span>
-                    <span className="break-all font-medium text-foreground">{selectedLog.endpoint}</span>
+                    <span className="break-all font-medium text-foreground">{selectedLog.readableAction || 'System Request'}</span>
                   </div>
                 </div>
 
@@ -744,8 +800,8 @@ export default function AuditLogs() {
                     </div>
                   </div>
                   <div className="bg-background p-2.5 rounded-lg border text-[11px]">
-                    <span className="text-muted-foreground uppercase text-[10px] font-bold block mb-1">Full User-Agent String:</span>
-                    <p className="font-mono text-muted-foreground break-all">{selectedLog.userAgent || 'None reported'}</p>
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold block mb-1">Parsed User-Agent:</span>
+                    <p className="font-mono text-muted-foreground break-all">{getLogDevice(selectedLog)}</p>
                   </div>
                 </div>
 
@@ -756,32 +812,10 @@ export default function AuditLogs() {
                       <FileJson className="w-4 h-4 text-primary" /> Request Payload & Modifications
                     </h3>
                     
-                    {/* Tabs Switcher */}
-                    <div className="flex bg-muted p-0.5 rounded-lg border text-xs font-semibold">
-                      <button
-                        onClick={() => setDrawerTab('summary')}
-                        className={`px-3 py-1 rounded-md transition-all ${drawerTab === 'summary' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        Formatted Changes
-                      </button>
-                      <button
-                        onClick={() => setDrawerTab('raw')}
-                        className={`px-3 py-1 rounded-md transition-all ${drawerTab === 'raw' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        Developer Raw JSON
-                      </button>
-                    </div>
+                    {/* Tabs Switcher removed */}
                   </div>
 
-                  {drawerTab === 'summary' ? (
-                    renderFormattedDetails(selectedLog.details)
-                  ) : (
-                    <div className="bg-[#18181b] p-4 rounded-xl border border-zinc-800 text-xs overflow-x-auto shadow-inner">
-                      <pre className="text-emerald-400 font-mono text-[11px] leading-relaxed">
-                        {JSON.stringify(selectedLog.details || {}, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                  {renderFormattedDetails(selectedLog.details)}
                 </div>
 
               </div>

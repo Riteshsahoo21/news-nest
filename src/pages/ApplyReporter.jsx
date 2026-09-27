@@ -31,13 +31,7 @@ export default function ApplyReporter() {
       return;
     }
     
-    if (!user.isPremium) {
-      alert("You must be a premium member to apply for a Reporter role.");
-      navigate('/profile');
-      return;
-    }
-    
-    if (user.roles.includes('reporter')) {
+    if (user.roles?.includes('reporter')) {
       alert("You are already a reporter!");
       navigate('/reporter/dashboard');
       return;
@@ -110,7 +104,7 @@ export default function ApplyReporter() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Reporter Application</h1>
-            <p className="text-gray-500 text-sm">Join our team of verified journalists</p>
+            <p className="text-gray-500 text-sm">Join our team of verified journalists. Applications are reviewed and approved by administrators.</p>
           </div>
         </div>
 

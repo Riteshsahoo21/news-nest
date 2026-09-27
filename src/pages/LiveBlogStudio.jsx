@@ -58,10 +58,12 @@ export default function LiveBlogStudio() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('list'); // 'list', 'create', 'desk'
   const [selectedBlog, setSelectedBlog] = useState(null);
+  const [mobileDeskTab, setMobileDeskTab] = useState('update'); // 'update', 'stream', 'score', 'config'
 
   // Form states for Create New Event
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Sports');
+  const [tags, setTags] = useState('');
   const [description, setDescription] = useState('');
   const [mainImageUrl, setMainImageUrl] = useState('');
   const [enableMatchScore, setEnableMatchScore] = useState(true);
@@ -269,6 +271,7 @@ export default function LiveBlogStudio() {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editCategory, setEditCategory] = useState('Sports');
+  const [editTags, setEditTags] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editMainImageUrl, setEditMainImageUrl] = useState('');
   const [uploadingEditCover, setUploadingEditCover] = useState(false);
@@ -299,6 +302,7 @@ export default function LiveBlogStudio() {
       const res = await api.put(`/live-blogs/${selectedBlog._id}`, {
         title: editTitle,
         category: editCategory,
+        tags: editTags,
         description: editDescription,
         mainImageUrl: editMainImageUrl
       });
@@ -395,6 +399,8 @@ export default function LiveBlogStudio() {
       const res = await api.post('/live-blogs', {
         title,
         category,
+        tags,
+        author: user?.fullName || 'Live Editor',
         description,
         mainImageUrl,
         streamType,
@@ -432,9 +438,11 @@ export default function LiveBlogStudio() {
     setDeskIsStreamActive(blog.isStreamActive === true);
     setEditTitle(blog.title || '');
     setEditCategory(blog.category || 'Sports');
+    setEditTags(Array.isArray(blog.tags) ? blog.tags.join(', ') : (blog.tags || ''));
     setEditDescription(blog.description || '');
     setEditMainImageUrl(blog.mainImageUrl || '');
     setIsEditingDetails(false);
+    setMobileDeskTab('update');
     setActiveTab('desk');
   };
 
@@ -545,33 +553,40 @@ export default function LiveBlogStudio() {
       )}
       {/* Top Banner & Navigation */}
       <div className="bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30 shadow-sm transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-red-600 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-red-500/20">
-              <Radio className="w-5 h-5 animate-pulse" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center justify-between sm:justify-start gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-tr from-red-600 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-red-500/20 shrink-0">
+                <Radio className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight font-serif flex items-center gap-1.5 sm:gap-2">
+                  <span>Live Studio</span>
+                  <span className="bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold tracking-wider uppercase shrink-0">
+                    Broadcast Desk
+                  </span>
+                </h1>
+                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">Real-time reporting & reader updates</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight font-serif flex items-center gap-2">
-                Live Blog Studio
-                <span className="bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
-                  Broadcast Desk
-                </span>
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Real-time reporting & interactive reader updates</p>
-            </div>
+            {selectedBlog && (
+              <span className="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-red-600 text-white animate-pulse shadow-xs shrink-0">
+                ● LIVE DESK
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             <button
               onClick={() => { setActiveTab('list'); setSelectedBlog(null); }}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'list' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+              className={`flex-1 sm:flex-initial text-center px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'list' && !selectedBlog ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-300 bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
             >
               All Events ({blogs.length})
             </button>
             <button
               onClick={() => { setActiveTab('create'); setSelectedBlog(null); }}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${activeTab === 'create' ? 'bg-red-600 text-white shadow-red-500/25' : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-900/50'}`}
+              className={`flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm ${activeTab === 'create' ? 'bg-red-600 text-white shadow-red-500/25' : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-900/50'}`}
             >
-              <Plus className="w-4 h-4" /> Create Live Event
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" /> Create Event
             </button>
           </div>
         </div>
@@ -647,18 +662,18 @@ export default function LiveBlogStudio() {
                         </div>
                       </div>
                     </div>
-                    <div className="p-4 bg-gray-50 dark:bg-[#161d2a] border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
+                    <div className="p-3.5 sm:p-4 bg-gray-50 dark:bg-[#161d2a] border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
                       <Link
                         to={`/live-blogs`}
-                        className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1 py-1.5 px-3 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-all"
+                        className="text-xs font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-center gap-1.5 py-2 px-3 sm:px-3.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs transition-all shrink-0"
                       >
-                        <Eye className="w-3.5 h-3.5" /> View Feed
+                        <Eye className="w-3.5 h-3.5 text-red-600" /> View Feed
                       </Link>
                       <button
                         onClick={() => openDesk(blog)}
-                        className="bg-gray-900 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-500 text-xs font-semibold py-2 px-4 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+                        className="flex-1 sm:flex-initial justify-center bg-gradient-to-r from-gray-900 to-slate-900 dark:from-red-600 dark:to-rose-600 text-white hover:bg-red-600 dark:hover:bg-red-500 text-xs font-extrabold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
                       >
-                        <Radio className="w-3.5 h-3.5 animate-pulse text-red-500 dark:text-white" /> Enter Studio
+                        <Radio className="w-3.5 h-3.5 animate-pulse text-red-500 dark:text-white" /> Enter Studio →
                       </button>
                     </div>
                   </div>
@@ -712,6 +727,17 @@ export default function LiveBlogStudio() {
                     <option value="Entertainment">Entertainment</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tags (comma separated)</label>
+                <input
+                  type="text"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  placeholder="e.g. sports, live, update"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium"
+                />
               </div>
 
               <div>
@@ -1033,35 +1059,37 @@ export default function LiveBlogStudio() {
           /* BROADCAST DESK FOR SELECTED EVENT */
           <div className="space-y-8">
             {/* Header info bar */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full md:w-auto">
                 <button
                   onClick={() => { setActiveTab('list'); setSelectedBlog(null); }}
-                  className="px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 transition-colors text-gray-800 font-bold text-xs flex items-center gap-2 shadow-2xs shrink-0"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-800 dark:text-gray-200 font-bold text-xs flex items-center justify-center sm:justify-start gap-2 shadow-xs shrink-0"
                   title="Return to master event list"
                 >
-                  <ArrowLeft className="w-4 h-4 text-red-600" />
+                  <ArrowLeft className="w-4 h-4 text-red-600 shrink-0" />
                   <span>Back to All Events</span>
                 </button>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold ${selectedBlog.isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-800 text-gray-200'}`}>
+                  <div className="flex items-center flex-wrap gap-2 mb-1.5">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-black font-mono shadow-2xs ${selectedBlog.isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-800 text-gray-200'}`}>
                       ● {selectedBlog.isLive ? 'LIVE BROADCASTING' : 'EVENT ARCHIVED'}
                     </span>
-                    <span className="text-xs font-bold uppercase text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                    <span className="text-[10px] sm:text-xs font-bold uppercase text-red-600 bg-red-50 dark:bg-red-950/50 px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-900 shadow-2xs">
                       {selectedBlog.category}
                     </span>
                   </div>
-                  <h2 className="text-xl font-bold font-serif text-gray-900">{selectedBlog.title}</h2>
-                  <p className="text-xs text-gray-500">Auto-updates synchronize with readers every 5 seconds</p>
+                  <h2 className="text-lg sm:text-xl font-bold font-serif text-gray-900 dark:text-white leading-snug">{selectedBlog.title}</h2>
+                  <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">Auto-updates synchronize with readers every 5 seconds</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+              {/* Desktop Action Buttons */}
+              <div className="hidden sm:flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
                 <button
                   onClick={() => {
                     setEditTitle(selectedBlog.title || '');
                     setEditCategory(selectedBlog.category || 'Sports');
+                    setEditTags(Array.isArray(selectedBlog.tags) ? selectedBlog.tags.join(', ') : (selectedBlog.tags || ''));
                     setEditDescription(selectedBlog.description || '');
                     setEditMainImageUrl(selectedBlog.mainImageUrl || '');
                     setIsEditingDetails(!isEditingDetails);
@@ -1090,9 +1118,94 @@ export default function LiveBlogStudio() {
               </div>
             </div>
 
-            {/* EDIT INITIAL EVENT DETAILS PANEL (TOGGLEABLE) */}
-            {isEditingDetails && (
-              <form onSubmit={handleSaveEditedDetails} className="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 text-white rounded-3xl p-8 border border-gray-800 shadow-2xl space-y-6 animate-fadeIn">
+            {/* Mobile Studio Field Switcher (sm:hidden) */}
+            <div className="sm:hidden grid grid-cols-4 gap-1 p-1.5 bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner">
+              <button
+                type="button"
+                onClick={() => setMobileDeskTab('update')}
+                className={`flex flex-col items-center justify-center py-2.5 px-0.5 rounded-xl font-extrabold text-[10px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+                  mobileDeskTab === 'update' ? 'bg-red-600 text-white shadow-md shadow-red-600/20 scale-[1.02]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <Send className="w-4 h-4 mb-1 shrink-0" />
+                <span className="truncate w-full text-center font-black">⚡ Update</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileDeskTab('stream')}
+                className={`flex flex-col items-center justify-center py-2.5 px-0.5 rounded-xl font-extrabold text-[10px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+                  mobileDeskTab === 'stream' ? 'bg-red-600 text-white shadow-md shadow-red-600/20 scale-[1.02]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <Radio className="w-4 h-4 mb-1 shrink-0 animate-pulse text-rose-300" />
+                <span className="truncate w-full text-center font-black">🎥 Camera</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileDeskTab('score')}
+                className={`flex flex-col items-center justify-center py-2.5 px-0.5 rounded-xl font-extrabold text-[10px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+                  mobileDeskTab === 'score' ? 'bg-red-600 text-white shadow-md shadow-red-600/20 scale-[1.02]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <Trophy className="w-4 h-4 mb-1 shrink-0 text-amber-400" />
+                <span className="truncate w-full text-center font-black">🏆 Scores</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDeskTab('config');
+                  if (!isEditingDetails && !editTitle) {
+                    setEditTitle(selectedBlog.title || '');
+                    setEditCategory(selectedBlog.category || 'Sports');
+                    setEditTags(Array.isArray(selectedBlog.tags) ? selectedBlog.tags.join(', ') : (selectedBlog.tags || ''));
+                    setEditDescription(selectedBlog.description || '');
+                    setEditMainImageUrl(selectedBlog.mainImageUrl || '');
+                  }
+                }}
+                className={`flex flex-col items-center justify-center py-2.5 px-0.5 rounded-xl font-extrabold text-[10px] font-mono uppercase tracking-tight transition-all overflow-hidden ${
+                  mobileDeskTab === 'config' ? 'bg-red-600 text-white shadow-md shadow-red-600/20 scale-[1.02]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <Settings className="w-4 h-4 mb-1 shrink-0" />
+                <span className="truncate w-full text-center font-black">⚙️ Config</span>
+              </button>
+            </div>
+
+            {/* Mobile-only Config Controls Card */}
+            <div className={`sm:hidden ${mobileDeskTab === 'config' ? 'block' : 'hidden'}`}>
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-3.5 mb-2">
+                <h3 className="font-extrabold text-xs uppercase tracking-wider font-mono text-gray-500 dark:text-gray-400 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
+                  <Settings className="w-4 h-4 text-red-600" /> Broadcast Status & Controls
+                </h3>
+                <div className="grid grid-cols-1 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleToggleEventStatus}
+                    className={`w-full py-3 px-4 rounded-2xl font-black text-xs border shadow-sm transition-all flex items-center justify-center gap-2 ${
+                      selectedBlog.isLive ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border-amber-500/30' : 'bg-green-600 text-white border-green-600'
+                    }`}
+                  >
+                    {selectedBlog.isLive ? '⬛ End Broadcast & Archive Event' : '🔴 Reopen & Resume Live Broadcast'}
+                  </button>
+                  <Link
+                    to="/live-blogs"
+                    className="w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-slate-950 text-white rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Eye className="w-4 h-4 text-red-500 shrink-0" /> Preview Reader Live Feed →
+                  </Link>
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center pt-1 font-sans">
+                  Edit initial title, story overview, and cover photo below.
+                </p>
+              </div>
+            </div>
+
+            {/* EDIT INITIAL EVENT DETAILS PANEL (TOGGLEABLE ON DESKTOP, OR WHEN CONFIG TAB IS ACTIVE ON MOBILE) */}
+            {(isEditingDetails || mobileDeskTab === 'config') && (
+              <form onSubmit={handleSaveEditedDetails} className={`bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 text-white rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl space-y-6 animate-fadeIn ${mobileDeskTab !== 'config' ? 'hidden sm:block' : 'block'}`}>
                 <div className="flex items-center justify-between border-b border-gray-800 pb-4">
                   <div className="flex items-center gap-2 font-serif text-lg font-bold text-white">
                     <Edit3 className="w-5 h-5 text-red-500" /> Modify Initial Event Metadata
@@ -1142,6 +1255,17 @@ export default function LiveBlogStudio() {
                         <option value="Technology">Technology</option>
                         <option value="Entertainment">Entertainment</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tags (comma separated)</label>
+                      <input
+                        type="text"
+                        value={editTags}
+                        onChange={(e) => setEditTags(e.target.value)}
+                        placeholder="e.g. sports, live"
+                        className="w-full px-4 py-3 rounded-xl bg-gray-800 text-white border border-gray-700 focus:border-red-500 text-sm font-bold"
+                      />
                     </div>
 
                     <div>
@@ -1199,11 +1323,11 @@ export default function LiveBlogStudio() {
                 </div>
               </form>
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
               {/* LEFT TWO COLUMNS: BROADCAST CONTROLS & TIMELINE */}
-              <div className="lg:col-span-2 space-y-8">
+              <div className="lg:col-span-2 space-y-6 sm:space-y-8">
                 {/* Live Video Streaming Desk Controls */}
-                <div className="bg-gradient-to-br from-gray-900 via-slate-950 to-gray-900 text-white rounded-3xl p-6 border border-gray-800 shadow-xl space-y-5">
+                <div className={`bg-gradient-to-br from-gray-900 via-slate-950 to-gray-900 text-white rounded-3xl p-5 sm:p-6 border border-gray-800 shadow-xl space-y-5 ${mobileDeskTab === 'stream' ? 'block' : 'hidden sm:block'}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-800">
                     <div className="flex items-center gap-2.5 font-serif font-bold text-lg">
                       <Radio className="w-5 h-5 text-red-500 animate-pulse" />
@@ -1414,9 +1538,11 @@ export default function LiveBlogStudio() {
                   </div>
                 </div>
 
+                {/* UPDATE TAB CONTAINER (Instant Form + Timeline History) */}
+                <div className={`space-y-6 sm:space-y-8 ${mobileDeskTab === 'update' ? 'block' : 'hidden sm:block'}`}>
                 {/* Instant Timeline Update Form */}
-                <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
                     <h3 className="text-base font-bold text-gray-900 font-serif flex items-center gap-2">
                       <Send className="w-4 h-4 text-red-600" /> Post Real-Time Timeline Text Update
                     </h3>
@@ -1536,10 +1662,11 @@ export default function LiveBlogStudio() {
                     </div>
                   )}
                 </div>
+                </div>
               </div>
 
               {/* RIGHT COLUMN: LIVE SCOREBOARD EDITOR & POLL STATUS */}
-              <div className="space-y-6">
+              <div className={`space-y-6 ${mobileDeskTab === 'score' ? 'block' : 'hidden sm:block'}`}>
                 {/* Scoreboard / Telemetry Editor Card */}
                 <div className="bg-gray-900 text-white rounded-3xl p-6 shadow-xl border border-gray-800 space-y-5">
                   <div className="flex items-center justify-between border-b border-gray-800 pb-3">

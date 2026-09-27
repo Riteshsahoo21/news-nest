@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useSearchParams } from 'react-router-dom';
+import { Routes, Route, useSearchParams } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import { Agentation } from 'agentation';
@@ -38,13 +38,9 @@ const FollowNetwork = lazy(() => import('./pages/FollowNetwork'));
 const Categories = lazy(() => import('./pages/Categories'));
 const ReporterDashboard = lazy(() => import('./pages/ReporterDashboard'));
 const EditorDashboard = lazy(() => import('./pages/EditorDashboard'));
-const SubscriptionPlansManagement = lazy(() => import('./pages/admin/SubscriptionPlansManagement'));
 const CategoryNews = lazy(() => import('./pages/CategoryNews'));
 const CategoryVideos = lazy(() => import('./pages/CategoryVideos'));
 const Search = lazy(() => import('./pages/Search'));
-const Subscriptions = lazy(() => import('./pages/Subscriptions'));
-const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
-const PaymentCancel = lazy(() => import('./pages/PaymentCancel'));
 const ApplyReporter = lazy(() => import('./pages/ApplyReporter'));
 
 // Admin Pages
@@ -69,16 +65,15 @@ const Reports = lazy(() => import('./pages/admin/Reports'));
 const AuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
 const BroadcastNotification = lazy(() => import('./pages/admin/BroadcastNotification'));
 
-function App() {
+function App({ helmetContext = {} }) {
   useEffect(() => {
     sessionStorage.removeItem('free_articles_read_list');
   }, []);
 
   return (
-    <HelmetProvider>
+    <HelmetProvider context={helmetContext}>
       <QueryProvider>
         <AuthProvider>
-          <Router>
             <Suspense fallback={<LoadingFallback />}>
               <Routes>
 
@@ -86,8 +81,6 @@ function App() {
           <Route element={<UserLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/article/:id" element={<ArticleDetails />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             <Route path="/live-blogs" element={<LiveBlogs />} />
             <Route path="/live-blog-studio" element={<LiveBlogStudio />} />
             <Route path="/videos" element={<Videos />} />
@@ -102,11 +95,12 @@ function App() {
             <Route path="/reporter/dashboard" element={<ReporterDashboard />} />
             <Route path="/editor/dashboard" element={<EditorDashboard />} />
             <Route path="/search" element={<Search />} />
-            <Route path="/subscriptions" element={<Subscriptions />} />
-            <Route path="/payment-success" element={<PaymentSuccess />} />
-            <Route path="/payment-cancel" element={<PaymentCancel />} />
             <Route path="/apply-reporter" element={<ApplyReporter />} />
           </Route>
+
+          {/* Auth Routes (No Navbar) */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']} requiredPermissions={['view_admin_panel']} />}>
@@ -124,9 +118,6 @@ function App() {
               <Route path="polls" element={<Polls />} />
               <Route path="newsletter" element={<Newsletter />} />
               <Route path="ads" element={<AdvertisementManagement />} />
-              <Route path="subscription-plans" element={<SubscriptionPlansManagement />} />
-              <Route path="coupons" element={<Coupons />} />
-              <Route path="revenue" element={<Revenue />} />
               <Route path="reporter-applications" element={<ReporterApplications />} />
               <Route path="broadcast-notifications" element={<BroadcastNotification />} />
               <Route path="settings" element={<Settings />} />
@@ -143,9 +134,8 @@ function App() {
             <GalleryModalManager />
           </Suspense>
           <Agentation />
-        </Router>
-      </AuthProvider>
-    </QueryProvider>
+        </AuthProvider>
+      </QueryProvider>
     </HelmetProvider>
   );
 }

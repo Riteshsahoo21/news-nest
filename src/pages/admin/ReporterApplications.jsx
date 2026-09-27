@@ -56,7 +56,7 @@ export default function ReporterApplications() {
           <FileText className="w-5 h-5 text-red-600" />
           Reporter Applications
         </h2>
-        <p className="text-sm text-gray-500 mt-1">Review requests from premium users to become reporters.</p>
+        <p className="text-sm text-gray-500 mt-1">Review and approve requests from users to become reporters.</p>
       </div>
       
       <div className="overflow-x-auto">

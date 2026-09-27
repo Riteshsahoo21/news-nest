@@ -9,7 +9,14 @@ const CategoryManagement = () => {
   const [loading, setLoading] = useState(true);
   
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ id: null, name: '', description: '', isActive: true });
+  const [formData, setFormData] = useState({ id: null, name: '', description: '', isActive: true, contentTypes: ['article', 'video', 'live_blog', 'photo_gallery'] });
+
+  const CONTENT_TYPE_OPTIONS = [
+    { value: 'article', label: 'Article News' },
+    { value: 'video', label: 'Video News' },
+    { value: 'live_blog', label: 'Live Blog' },
+    { value: 'photo_gallery', label: 'Photo Gallery' }
+  ];
 
   useEffect(() => {
     fetchCategories();
@@ -29,9 +36,15 @@ const CategoryManagement = () => {
 
   const handleOpenModal = (category = null) => {
     if (category) {
-      setFormData({ id: category._id, name: category.name, description: category.description || '', isActive: category.isActive });
+      setFormData({ 
+        id: category._id, 
+        name: category.name, 
+        description: category.description || '', 
+        isActive: category.isActive,
+        contentTypes: category.contentTypes || ['article', 'video', 'live_blog', 'photo_gallery'] 
+      });
     } else {
-      setFormData({ id: null, name: '', description: '', isActive: true });
+      setFormData({ id: null, name: '', description: '', isActive: true, contentTypes: ['article', 'video', 'live_blog', 'photo_gallery'] });
     }
     setShowModal(true);
   };
@@ -40,9 +53,9 @@ const CategoryManagement = () => {
     e.preventDefault();
     try {
       if (formData.id) {
-        await api.put(`/categories/${formData.id}`, { name: formData.name, description: formData.description, isActive: formData.isActive });
+        await api.put(`/categories/${formData.id}`, { name: formData.name, description: formData.description, isActive: formData.isActive, contentTypes: formData.contentTypes });
       } else {
-        await api.post('/categories', { name: formData.name, description: formData.description });
+        await api.post('/categories', { name: formData.name, description: formData.description, contentTypes: formData.contentTypes });
       }
       setShowModal(false);
       fetchCategories();
@@ -92,10 +105,18 @@ const CategoryManagement = () => {
                 </span>
               </div>
               
-              <p className="text-sm text-gray-500 mb-6 flex-1">
+              <p className="text-sm text-gray-500 mb-4 flex-1">
                 {category.description || 'No description provided.'}
               </p>
               
+              <div className="flex flex-wrap gap-1 mb-4">
+                {category.contentTypes && category.contentTypes.map(type => (
+                  <span key={type} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] uppercase font-bold rounded">
+                    {type.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
+
               <div className="flex gap-2 pt-4 border-t border-gray-100">
                 <Button onClick={() => handleOpenModal(category)} variant="outline" className="flex-1 text-gray-600 hover:text-blue-600 border-gray-200 hover:bg-blue-50 hover:border-blue-200 h-9">
                   <Edit2 className="h-3.5 w-3.5 mr-2" /> Edit
@@ -138,6 +159,28 @@ const CategoryManagement = () => {
                   placeholder="Category description..."
                   rows="3"
                 ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Applies to Content Types</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {CONTENT_TYPE_OPTIONS.map((option) => (
+                    <label key={option.value} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input 
+                        type="checkbox"
+                        checked={formData.contentTypes.includes(option.value)}
+                        onChange={(e) => {
+                          const newTypes = e.target.checked 
+                            ? [...formData.contentTypes, option.value]
+                            : formData.contentTypes.filter(t => t !== option.value);
+                          setFormData({ ...formData, contentTypes: newTypes });
+                        }}
+                        className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {formData.id && (

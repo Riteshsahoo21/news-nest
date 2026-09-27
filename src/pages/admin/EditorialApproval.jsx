@@ -17,14 +17,16 @@ const EditorialApproval = () => {
   const fetchPendingNews = async () => {
     try {
       setLoading(true);
-      const [newsRes, galleriesRes] = await Promise.all([
+      const [newsRes, galleriesRes, videosRes] = await Promise.all([
         api.get('/news/pending'),
-        api.get('/photo-galleries/pending')
+        api.get('/photo-galleries/pending'),
+        api.get('/videos/pending')
       ]);
       
       const combined = [
         ...newsRes.data.map(item => ({ ...item, contentType: 'article' })),
-        ...galleriesRes.data.map(item => ({ ...item, contentType: 'gallery' }))
+        ...galleriesRes.data.map(item => ({ ...item, contentType: 'gallery' })),
+        ...videosRes.data.map(item => ({ ...item, contentType: 'video' }))
       ];
       
       // Sort newest first
@@ -42,8 +44,10 @@ const EditorialApproval = () => {
     try {
       if (item.contentType === 'article') {
         await api.put(`/news/${item._id}/approve`);
-      } else {
+      } else if (item.contentType === 'gallery') {
         await api.put(`/photo-galleries/${item._id}/approve`);
+      } else if (item.contentType === 'video') {
+        await api.put(`/videos/${item._id}/approve`);
       }
       setPendingArticles(pendingArticles.filter(a => a._id !== item._id));
       if (selectedArticle?._id === item._id) setSelectedArticle(null);
@@ -60,8 +64,10 @@ const EditorialApproval = () => {
     try {
       if (item.contentType === 'article') {
         await api.put(`/news/${item._id}/reject`, { reason: rejectReason });
-      } else {
+      } else if (item.contentType === 'gallery') {
         await api.put(`/photo-galleries/${item._id}/reject`, { reason: rejectReason });
+      } else if (item.contentType === 'video') {
+        await api.put(`/videos/${item._id}/reject`, { reason: rejectReason });
       }
       setPendingArticles(pendingArticles.filter(a => a._id !== item._id));
       if (selectedArticle?._id === item._id) {
@@ -128,7 +134,25 @@ const EditorialApproval = () => {
                   </div>
                 </div>
 
-                {selectedArticle.contentType === 'article' && selectedArticle.imageUrl && (
+                {selectedArticle.contentType === 'article' && selectedArticle.mediaUrls && selectedArticle.mediaUrls.length > 1 ? (
+                  <div className="mb-6 grid gap-4">
+                    <img 
+                      src={selectedArticle.mediaUrls[0].startsWith('http') ? selectedArticle.mediaUrls[0] : `http://localhost:5000/${selectedArticle.mediaUrls[0].replace('\\', '/')}`}
+                      alt={selectedArticle.title}
+                      className="w-full h-64 object-cover rounded-lg"
+                    />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {selectedArticle.mediaUrls.slice(1).map((url, idx) => (
+                        <img 
+                          key={idx} 
+                          src={url.startsWith('http') ? url : `http://localhost:5000/${url.replace('\\', '/')}`} 
+                          alt={`${selectedArticle.title} ${idx+2}`} 
+                          className="w-full h-24 object-cover rounded-lg" 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : selectedArticle.contentType === 'article' && selectedArticle.imageUrl && (
                   <img 
                     src={selectedArticle.imageUrl.startsWith('http') ? selectedArticle.imageUrl : `http://localhost:5000/${selectedArticle.imageUrl.replace('\\', '/')}`}
                     alt={selectedArticle.title}
@@ -146,6 +170,26 @@ const EditorialApproval = () => {
                         className="w-full h-48 object-cover rounded-lg"
                       />
                     ))}
+                  </div>
+                )}
+
+                {selectedArticle.contentType === 'video' && selectedArticle.videoUrl && (
+                  <div className="mb-6 rounded-lg overflow-hidden bg-black aspect-video relative">
+                    {selectedArticle.videoUrl.includes('youtube.com/embed') || selectedArticle.videoUrl.includes('vimeo.com') ? (
+                      <iframe
+                        src={selectedArticle.videoUrl}
+                        title="Video Player"
+                        className="w-full h-full absolute inset-0"
+                        allowFullScreen
+                      ></iframe>
+                    ) : (
+                      <video 
+                        controls
+                        src={selectedArticle.videoUrl}
+                        className="w-full h-full absolute inset-0 object-contain"
+                        poster={selectedArticle.thumbnailUrl}
+                      />
+                    )}
                   </div>
                 )}
 

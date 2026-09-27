@@ -61,7 +61,7 @@ export default function Categories() {
           {categories.map((category) => (
             <Link 
               key={category._id} 
-              to={`/category/${category._id}`}
+              to={`/category/${encodeURIComponent(category.name.toLowerCase())}`}
             className="flex items-center justify-between p-4 bg-card border rounded-xl hover:border-primary transition-colors group shadow-sm"
           >
               <div className="flex items-center space-x-4">

@@ -156,9 +156,17 @@ export default function Subscriptions() {
 
                     <div className="p-8 pt-0 mt-auto">
                       {isActivePlan && !user?.cancelAtPeriodEnd ? (
-                        <Button className="w-full bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 cursor-default rounded-2xl h-14 font-semibold text-lg" disabled>
-                          Active Subscription
-                        </Button>
+                        <div className="flex flex-col gap-3 w-full">
+                          <Button className="w-full bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 cursor-default rounded-2xl h-14 font-semibold text-lg" disabled>
+                            Active Subscription
+                          </Button>
+                          <button 
+                            onClick={() => setShowCancelModal(true)}
+                            className="text-red-500 hover:text-red-600 text-sm font-semibold text-center transition-colors hover:underline"
+                          >
+                            Cancel Subscription
+                          </button>
+                        </div>
                       ) : (
                         <Button 
                           onClick={() => handleSubscribe(plan._id)} 

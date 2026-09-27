@@ -76,10 +76,10 @@ export default function Navbar() {
     <>
       <nav className="bg-white dark:bg-[#0f172a] border-b border-gray-100 dark:border-gray-800 sticky top-0 z-50 shadow-sm transition-colors">
         {/* Top Row: Logo, Search, Icons */}
-        <div className="max-w-[1640px] mx-auto px-3 sm:px-6 md:px-10 xl:px-12 h-16 flex items-center justify-between w-full">
+        <div className="max-w-[1640px] mx-auto px-2.5 sm:px-6 md:px-10 xl:px-12 h-14 sm:h-16 flex items-center justify-between w-full max-w-full min-w-0 gap-1.5 sm:gap-4">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center shrink-0 space-x-1.5 sm:space-x-2">
+          <Link to="/" className="flex items-center shrink-0 space-x-1 sm:space-x-2 min-w-0">
             {/* Custom SVG Logo matching the uploaded image */}
             <svg className="w-9 sm:w-[46px] h-auto" viewBox="0 0 60 55" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -137,7 +137,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Action Icons */}
-          <div className="flex items-center space-x-3 md:space-x-4 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 md:gap-4 shrink-0">
             
             {/* Mobile Search Icon */}
             <button onClick={() => navigate('/search')} className="md:hidden p-2 text-gray-600 dark:text-gray-300">
@@ -178,39 +178,17 @@ export default function Navbar() {
             {/* Auth Button */}
             {isAuthenticated ? (
               <div className="flex items-center pl-2 md:pl-4">
-                <Link to="/profile" className="relative group flex items-center justify-center">
-                  <div className={`relative flex items-center justify-center w-9 h-9 rounded-full border-2 transition-all duration-300 ${
-                    user?.isPremium 
-                      ? 'border-yellow-400 bg-gradient-to-br from-yellow-100 to-amber-100 dark:from-yellow-900/40 dark:to-amber-900/40 shadow-[0_0_10px_rgba(250,204,21,0.3)] group-hover:shadow-[0_0_15px_rgba(250,204,21,0.5)]' 
-                      : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}>
-                    {user?.isPremium ? (
-                      <User className="w-4 h-4 text-yellow-700 dark:text-yellow-500" />
-                    ) : (
-                      <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    )}
+                <Link to="/profile" className="relative flex items-center justify-center">
+                  <div className="relative flex items-center justify-center w-9 h-9 rounded-full border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300">
+                    <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   </div>
-                  
-                  {/* Premium Badge Overlap */}
-                  {user?.isPremium && (
-                    <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full p-[2px] shadow-sm border border-white dark:border-[#0f172a] z-10">
-                      <Star className="w-2.5 h-2.5 text-white fill-white" />
-                    </div>
-                  )}
-                  
-                  {/* Upgrade Tooltip for Free Users (Hover only, zero space taken) */}
-                  {!user?.isPremium && (
-                    <div className="absolute top-11 right-0 w-32 p-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[11px] font-medium rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 text-center pointer-events-none transform translate-y-1 group-hover:translate-y-0">
-                      Upgrade to Premium
-                    </div>
-                  )}
                 </Link>
               </div>
             ) : (
-              <Link to="/login" className="pl-2">
-                <Button className="bg-[#dc2626] hover:bg-[#b91c1c] text-white h-9 px-4 rounded-lg shadow-sm">
+              <Link to="/login" className="pl-0.5 sm:pl-2">
+                <Button className="bg-[#dc2626] hover:bg-[#b91c1c] text-white h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg shadow-sm">
                   <User className="w-4 h-4 mr-2 hidden md:block" />
-                  <span className="text-sm font-medium">Sign In</span>
+                  <span className="text-xs sm:text-sm font-bold">Sign In</span>
                 </Button>
               </Link>
             )}
