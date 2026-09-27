@@ -217,21 +217,21 @@ export const upsertLiveFixture = async (req, res) => {
       });
       created = true;
     } else {
-      if (!liveBlog.title) liveBlog.title = title;
-      if (!liveBlog.description) liveBlog.description = description;
-      if (!liveBlog.mainImageUrl) liveBlog.mainImageUrl = mainImageUrl;
-      if (team1Name && (!liveBlog.matchStatus?.team1?.name || liveBlog.matchStatus.team1.name === '')) {
-        if (!liveBlog.matchStatus) liveBlog.matchStatus = {};
-        liveBlog.matchStatus.team1 = { name: team1Name, score: cleanString(fixture.team1?.score || 'Yet to bat', 100) };
+      if (title) liveBlog.title = title;
+      if (description) liveBlog.description = description;
+      if (mainImageUrl) liveBlog.mainImageUrl = mainImageUrl;
+      if (category) liveBlog.category = category;
+      liveBlog.isLive = true;
+      if (!liveBlog.matchStatus) liveBlog.matchStatus = {};
+      if (team1Name) liveBlog.matchStatus.team1 = { name: team1Name, score: cleanString(fixture.team1?.score || liveBlog.matchStatus.team1?.score || 'Yet to bat', 100) };
+      if (team2Name) liveBlog.matchStatus.team2 = { name: team2Name, score: cleanString(fixture.team2?.score || liveBlog.matchStatus.team2?.score || 'Yet to bat', 100) };
+      if (venue || matchType) {
+        liveBlog.matchStatus.matchInfo = [matchType, venue].filter(Boolean).join(', ') || liveBlog.matchStatus.matchInfo;
       }
-      if (team2Name && (!liveBlog.matchStatus?.team2?.name || liveBlog.matchStatus.team2.name === '')) {
-        if (!liveBlog.matchStatus) liveBlog.matchStatus = {};
-        liveBlog.matchStatus.team2 = { name: team2Name, score: cleanString(fixture.team2?.score || 'Yet to bat', 100) };
+      if (Array.isArray(fixture.customStats) && fixture.customStats.length > 0) {
+        liveBlog.matchStatus.customStats = fixture.customStats;
       }
-      if (venue && (!liveBlog.matchStatus?.matchInfo || liveBlog.matchStatus.matchInfo === '')) {
-        liveBlog.matchStatus.matchInfo = [matchType, venue].filter(Boolean).join(', ');
-      }
-      if ((!liveBlog.poll || !liveBlog.poll.question) && defaultPoll.question) {
+      if (defaultPoll.question && (!liveBlog.poll || !liveBlog.poll.question || liveBlog.poll.question.includes('Ahmedabad'))) {
         liveBlog.poll = defaultPoll;
       }
       await liveBlog.save();
@@ -298,11 +298,17 @@ export const syncLiveScore = async (req, res) => {
       ? score.updates
       : (updateContent ? [{ title: updateTitle, content: updateContent }] : []);
 
-    for (const item of incomingUpdates) {
+    // Filter out dummy/stale updates if real commentary is present
+    if (incomingUpdates.length > 0 && liveBlog.updates.some(u => u.content && u.content.includes('Ahmedabad'))) {
+      liveBlog.updates = liveBlog.updates.filter(u => !u.content.includes('Ahmedabad'));
+    }
+
+    // Ingest newest updates first
+    for (const item of [...incomingUpdates].reverse()) {
       const content = cleanString(item.content || item, 4000);
       const title = cleanString(item.title || 'LIVE UPDATE', 200);
       if (content && !liveBlog.updates.some((u) => u.content === content)) {
-        liveBlog.updates.push({
+        liveBlog.updates.unshift({
           title,
           content,
           createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
@@ -314,12 +320,11 @@ export const syncLiveScore = async (req, res) => {
     if (updateId) liveBlog.lastExternalUpdateId = updateId;
 
     const isComplete = toBoolean(score.isComplete || score.matchComplete);
-    if (isComplete && liveBlog.isLive) {
+    if (isComplete) {
       const finalText = cleanString(score.result || score.status || 'Match complete.', 1000);
       if (finalText && !liveBlog.updates.some((update) => update.title === 'MATCH OVER' && update.content === finalText)) {
-        liveBlog.updates.push({ title: 'MATCH OVER', content: finalText });
+        liveBlog.updates.unshift({ title: 'MATCH OVER', content: finalText });
       }
-      liveBlog.isLive = false;
     }
 
     liveBlog.updatedAt = new Date();
@@ -479,9 +484,7 @@ export const seedMultiCategoryLiveBlogs = async (req, res) => {
         liveBlog.mainImageUrl = seed.mainImageUrl;
         liveBlog.matchStatus = seed.matchStatus;
         liveBlog.poll = seed.poll;
-        if (!liveBlog.updates || liveBlog.updates.length === 0) {
-          liveBlog.updates = seed.updates;
-        }
+        liveBlog.updates = seed.updates;
         liveBlog.updatedAt = new Date();
         await liveBlog.save();
       }

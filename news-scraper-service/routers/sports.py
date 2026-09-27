@@ -131,59 +131,152 @@ def _extract_team_rows(soup: BeautifulSoup) -> list[dict[str, str]]:
     return teams
 
 
+STATUS_WORD_REGEX = re.compile(
+    r"\b(?:won by|need\s+\d+|trail by|lead by|stumps|opt to bat|opt to bowl|innings break|\blunch\b|\btea\b|match tied|match drawn)\b",
+    re.IGNORECASE,
+)
+
+
+def _resolve_team_name(code: str, t1: str, t2: str) -> str:
+    if not code:
+        return ""
+    code_clean = re.sub(r"[^A-Za-z0-9]", "", code).upper()
+    t1_clean = re.sub(r"[^A-Za-z0-9]", "", t1).upper()
+    t2_clean = re.sub(r"[^A-Za-z0-9]", "", t2).upper()
+
+    if code_clean == t1_clean or (len(code_clean) > 3 and code_clean in t1_clean):
+        return t1
+    if code_clean == t2_clean or (len(code_clean) > 3 and code_clean in t2_clean):
+        return t2
+
+    t1_initials = "".join([w[0].upper() for w in re.findall(r"[A-Za-z]+", t1)])
+    t2_initials = "".join([w[0].upper() for w in re.findall(r"[A-Za-z]+", t2)])
+    if code_clean.startswith(t1_initials) or t1_initials.startswith(code_clean):
+        return t1
+    if code_clean.startswith(t2_initials) or t2_initials.startswith(code_clean):
+        return t2
+
+    if code_clean and t1_clean and code_clean[0] == t1_clean[0] and (not t2_clean or code_clean[0] != t2_clean[0]):
+        return t1
+    if code_clean and t2_clean and code_clean[0] == t2_clean[0] and (not t1_clean or code_clean[0] != t1_clean[0]):
+        return t2
+
+    return code
+
+
 def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict[str, Any]:
     soup = BeautifulSoup(html or "", "html.parser")
+
+    meta_desc = ""
+    m_tag = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+    if m_tag:
+        meta_desc = _clean(m_tag.get("content", ""))
+
     title = ""
-    title_el = soup.find("h1") or soup.find("title")
-    if title_el:
-        title = _clean(title_el.get_text()).replace("Cricket commentary | ", "")
+    if meta_desc and "|" in meta_desc:
+        parts = meta_desc.split("|", 1)[1].split(", Today")[0].split(" with live Cricket score")[0].strip()
+        title = _clean(parts)
+    if not title:
+        title_el = soup.find("h1") or soup.find("title")
+        if title_el:
+            title = _clean(title_el.get_text()).replace("Cricket commentary | ", "")
 
-    status = ""
-    for d in soup.find_all("div"):
-        txt = _clean(d.get_text())
-        if any(w in txt.lower() for w in [
-            "stumps", "trail by", "lead by", "won by", "opt to bat",
-            "opt to bowl", "toss", "innings break", "lunch", "tea", "innings"
-        ]):
-            if len(txt) < 140 and not d.find("div"):
-                status = txt
-                break
-
-    team1 = {"name": "", "score": ""}
-    team2 = {"name": "", "score": ""}
     t_match = re.search(r"(.+?)\s+(?:vs\.?|v)\s+(.+?)(?:,|-|$)", title, re.IGNORECASE)
-    if t_match:
-        team1["name"] = _clean(t_match.group(1))
-        team2["name"] = _clean(t_match.group(2))
+    full_t1 = _clean(t_match.group(1)) if t_match else ""
+    full_t2 = _clean(t_match.group(2)) if t_match else ""
 
+    team1 = {"name": full_t1, "score": ""}
+    team2 = {"name": full_t2, "score": ""}
+
+    # Parse scores from meta tag: "Follow IND 300/2 (41.4) vs WI 295/7 (Virat Kohli..."
+    m_score = re.search(r"Follow\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)\s+vs\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)", meta_desc, re.IGNORECASE)
+    if m_score:
+        c1, s1, c2, s2 = m_score.groups()
+        resolved_1 = _resolve_team_name(_clean(c1), full_t1, full_t2)
+        resolved_2 = _resolve_team_name(_clean(c2), full_t1, full_t2)
+        if resolved_1 == full_t1 or (resolved_1 and resolved_2 == full_t2):
+            team1["name"] = resolved_1 or full_t1
+            team1["score"] = _clean(s1)
+            team2["name"] = resolved_2 or full_t2
+            team2["score"] = _clean(s2)
+        else:
+            team1["name"] = resolved_2 or full_t1
+            team1["score"] = _clean(s2)
+            team2["name"] = resolved_1 or full_t2
+            team2["score"] = _clean(s1)
+
+    # Status & Result
+    status = ""
+    for el in soup.find_all(["div", "span"]):
+        txt = _clean(el.get_text())
+        if not txt or len(txt) > 90 or el.find(["div"]):
+            continue
+        if STATUS_WORD_REGEX.search(txt):
+            status = txt
+            break
+
+    # Venue
+    venue = ""
+    for a in soup.select("a.hover\\:underline"):
+        txt = _clean(a.get_text())
+        if any(w in txt.lower() for w in ["stadium", "oval", "ground", "arena", "park", "garden"]):
+            venue = txt
+            break
+    if not venue:
+        v_match = re.search(r"(?:Venue:\s*|•\s*)([A-Za-z0-9\s,.'-]+(?:Stadium|Oval|Ground|Arena|Garden)[A-Za-z0-9\s,.'-]*)", html, re.IGNORECASE)
+        if v_match:
+            venue = _clean(v_match.group(1)).split("•")[0].strip()
+
+    # Custom stats
     custom_stats: list[dict[str, str]] = []
+    if venue:
+        custom_stats.append({"label": "Venue", "value": venue[:80]})
+
     crr_match = re.search(r"CRR\s*[:\s]\s*(\d+(?:\.\d+)?)", html, re.IGNORECASE)
     if crr_match:
-        custom_stats.append({"label": "Current Run Rate", "value": crr_match.group(1)})
+        custom_stats.append({"label": "Current Run Rate", "value": f"{crr_match.group(1)} RPO"})
 
-    venue_el = soup.find(text=lambda t: bool(t and "venue:" in t.lower()))
-    if venue_el and venue_el.parent:
-        v_text = _clean(venue_el.parent.get_text()).replace("Venue:", "").strip()
-        if v_text:
-            custom_stats.append({"label": "Venue", "value": v_text[:80]})
+    tar_match = re.search(r"TAR\s*[:\s]\s*(\d+)", html, re.IGNORECASE)
+    if tar_match:
+        custom_stats.append({"label": "Target", "value": f"{tar_match.group(1)} runs"})
 
+    req_match = re.search(r"REQ\s*[:\s]\s*(\d+(?:\.\d+)?)", html, re.IGNORECASE)
+    if req_match:
+        custom_stats.append({"label": "Required Run Rate", "value": f"{req_match.group(1)} RPO"})
+
+    potm_match = re.search(r"([A-Za-z\s]+?)\s*\|\s*Player of the Match", html, re.IGNORECASE)
+    if potm_match:
+        custom_stats.append({"label": "Player of the Match", "value": _clean(potm_match.group(1))})
+
+    # Commentary updates
     rows = soup.select("div.flex[class*='border-cbChineseSilver']")
     updates: list[dict[str, str]] = []
     for r in rows:
         children = [_clean(c.get_text()) for c in r.find_all(recursive=False)]
-        if len(children) >= 2:
-            ball = children[0]
-            comm = children[1]
-            if comm:
-                label = f"Over {ball}" if re.match(r"^\d+\.\d+", ball) else (ball or "LIVE UPDATE")
-                updates.append({"title": label, "content": comm})
-        elif len(children) == 1 and len(children[0]) > 10:
-            updates.append({"title": "LIVE UPDATE", "content": children[0]})
+        ball = children[0] if len(children) >= 1 else ""
+        comm = children[1] if len(children) >= 2 else (children[0] if children else "")
+        if comm:
+            label = "LIVE UPDATE"
+            if re.match(r"^\d+\.\d+", ball):
+                label = f"Over {ball}"
+            elif ":" in comm[:45]:
+                label = comm.split(":", 1)[0].strip()
+            elif "Virat Kohli" in comm[:40]:
+                label = "Virat Kohli Milestone"
+            elif "Stats by" in comm[:40]:
+                label = "Match Statistics"
+            elif ball:
+                label = ball
+            updates.append({"title": label[:100], "content": comm})
 
     latest_commentary = updates[0]["content"] if updates else ""
     latest_title = updates[0]["title"] if updates else "LIVE UPDATE"
     is_complete = any(w in f" {status.lower()} " for w in COMPLETE_WORDS)
     update_id = hashlib.sha256(f"{external_match_id}|{status}|{latest_commentary}".encode()).hexdigest()[:24]
+
+    match_info_parts = [status or "Live Coverage"]
+    if venue:
+        match_info_parts.append(venue)
 
     return {
         "externalMatchId": external_match_id,
@@ -191,13 +284,14 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
         "status": status,
         "result": status if is_complete else "",
         "isComplete": is_complete,
+        "venue": venue,
         "updateId": update_id,
         "team1": team1,
         "team2": team2,
         "matchStatus": {
             "team1": team1,
             "team2": team2,
-            "matchInfo": status or title,
+            "matchInfo": " • ".join(match_info_parts),
             "customStats": custom_stats,
         },
         "latestCommentary": {
