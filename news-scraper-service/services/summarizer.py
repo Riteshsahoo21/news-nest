@@ -1,3 +1,5 @@
+import os
+import json
 import re
 import math
 from typing import List, Dict
@@ -109,7 +111,6 @@ async def gemini_summarize(text: str, title: str = "") -> dict:
             if res.status_code == 200:
                 data = res.json()
                 candidate_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                import json
                 parsed = json.loads(candidate_text)
                 if "executiveSummary" in parsed and "keyTakeaways" in parsed:
                     return parsed
