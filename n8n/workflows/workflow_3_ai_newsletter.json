@@ -1,4 +1,5 @@
 {
+  "id": "FWSnGEXnyfpxkPz1",
   "name": "News Nest 3 - AI Daily Newsletter",
   "nodes": [
     {
@@ -6,10 +7,8 @@
         "rule": {
           "interval": [
             {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 8,
-              "triggerAtMinute": 0
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
             }
           ]
         }
@@ -30,7 +29,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/newsletter/context' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/newsletter/context' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -63,7 +62,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash') + ':generateContent' }}",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_TEXT_MODEL || 'gemini-flash-lite-latest') + ':generateContent' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -108,7 +107,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/newsletter/send' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/newsletter/send' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -157,12 +156,14 @@
       "main": [[{"node": "Send Through News Nest SMTP", "type": "main", "index": 0}]]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "timezone": "Asia/Kolkata",
     "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "none"
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
   },
   "versionId": "1dce5e1e-35b3-4118-975a-0c4f6bd04df7",
   "meta": {

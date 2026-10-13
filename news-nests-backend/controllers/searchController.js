@@ -22,7 +22,11 @@ const SEARCH_FIELDS = {
     'title', 'subtitle', 'content', 'category', 'subCategory', 'tags', 'author',
     'sourceName', 'country', 'region', 'city', 'aiSummary', 'keyTakeaways'
   ],
-  liveBlogs: ['title', 'description', 'category', 'author', 'tags', 'updates.title', 'updates.content'],
+  liveBlogs: [
+    'title', 'description', 'category', 'author', 'tags',
+    'matchStatus.team1.name', 'matchStatus.team2.name', 'matchStatus.matchInfo',
+    'updates.title', 'updates.content'
+  ],
   videos: ['title', 'description', 'category', 'reporter', 'tags'],
   photoGalleries: ['title', 'description', 'category', 'photographer', 'tags', 'photos.caption']
 };

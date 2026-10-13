@@ -18,10 +18,11 @@ test('normalizes whitespace and keeps quoted phrases as one term', () => {
 
 test('treats regular-expression characters as literal search text', () => {
   const filter = buildSearchFilter('C++ [AI]', ['title']);
-  assert.equal(filter.$and.length, 2);
-  assert.equal(filter.$and[0].$or[0].title.$regex.test('A C++ release'), true);
-  assert.equal(filter.$and[1].$or[0].title.$regex.test('Daily [AI] briefing'), true);
-  assert.equal(filter.$and[1].$or[0].title.$regex.test('Daily A briefing'), false);
+  const andClauses = filter.$and || (filter.$or && filter.$or[0].$and);
+  assert.equal(andClauses.length, 2);
+  assert.equal(andClauses[0].$or[0].title.$regex.test('A C++ release'), true);
+  assert.equal(andClauses[1].$or[0].title.$regex.test('Daily [AI] briefing'), true);
+  assert.equal(andClauses[1].$or[0].title.$regex.test('Daily A briefing'), false);
 });
 
 test('matches whole words and phrases without substring ambiguity', () => {

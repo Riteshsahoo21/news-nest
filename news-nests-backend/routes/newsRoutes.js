@@ -21,7 +21,8 @@ import {
   getRelatedNews,
   proxyImage,
   getLocalNews,
-  generateArticleBackstory
+  generateArticleBackstory,
+  generateArticleSummary
 } from '../controllers/newsController.js';
 import { verifyToken, authorizePermissions } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
@@ -41,6 +42,8 @@ router.get('/author/:authorId', getNewsByAuthor);
 router.get('/article/:id', getNewsById);
 router.post('/article/:id/backstory', generateArticleBackstory);
 router.get('/article/:id/backstory', generateArticleBackstory);
+router.post('/article/:id/summary', generateArticleSummary);
+router.get('/article/:id/summary', generateArticleSummary);
 router.post('/article/:id/share', shareNews);
 
 // --- Protected Workflow Routes ---

@@ -57,7 +57,8 @@ export default function ArticleDetails() {
         const art = response.data.article || response.data;
         if (art && (!art.relatedArticles || art.relatedArticles.length === 0)) {
           try {
-            const relRes = await api.get(`/news/related?articleId=${art._id}&category=${art.category}`);
+            const tagsParam = Array.isArray(art.tags) ? art.tags.join(',') : '';
+            const relRes = await api.get(`/news/related?articleId=${art._id}&category=${encodeURIComponent(art.category || '')}&tags=${encodeURIComponent(tagsParam)}&title=${encodeURIComponent(art.title || '')}`);
             if (relRes.data && relRes.data.length > 0) {
               art.relatedArticles = relRes.data;
             }
@@ -341,8 +342,10 @@ export default function ArticleDetails() {
             {/* AI Executive Briefing / Key Takeaways */}
             <div className="mb-8 not-prose">
               <AiSummaryCard 
+                articleId={article.slug || article._id}
                 aiSummary={article.aiSummary} 
                 keyTakeaways={article.keyTakeaways} 
+                aiSummaryGenerated={article.aiSummaryGenerated}
               />
             </div>
 

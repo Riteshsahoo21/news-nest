@@ -50,6 +50,9 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
         const res = await api.get(`/live-blogs/${blogId}`);
         if (!isMounted) return;
         const data = res.data;
+        if (Array.isArray(data?.updates)) {
+          data.updates.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
         setBlog(data);
 
         if (user && data.savedBy) {
@@ -88,6 +91,9 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
       if (isInitial) setLoading(true);
       const res = await api.get(`/live-blogs/${blogId}`);
       const data = res.data;
+      if (Array.isArray(data?.updates)) {
+        data.updates.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
       setBlog(data);
 
       if (user && data.savedBy) {
@@ -449,17 +455,9 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
                   ) : (
                     <div className="relative border-l-2 border-red-500/40 ml-3 sm:ml-4 pl-6 sm:pl-8 space-y-10 py-2">
                       {blog.updates.map((upd, index) => {
-                        let bulletinDate = upd.createdAt ? new Date(upd.createdAt) : null;
-                        if (!bulletinDate || isNaN(bulletinDate.getTime())) {
-                          bulletinDate = new Date(Date.now() - index * 3 * 60 * 1000);
-                        } else if (index > 0 && blog.updates[0]?.createdAt) {
-                          const firstTime = new Date(blog.updates[0].createdAt).getTime();
-                          const thisTime = bulletinDate.getTime();
-                          if (Math.abs(firstTime - thisTime) < 5000) {
-                            bulletinDate = new Date(firstTime - index * 3 * 60 * 1000);
-                          }
-                        }
+                        const bulletinDate = upd.createdAt ? new Date(upd.createdAt) : new Date(Date.now() - index * 60 * 1000);
                         const timeStr = bulletinDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                        const relativeStr = getTimeElapsed(upd.createdAt);
                         const isLatest = index === 0 && blog.isLive;
 
                         return (
@@ -472,6 +470,9 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
                             <div className="flex items-center gap-2 mb-2.5 flex-wrap">
                               <span className="font-mono text-xs font-extrabold text-slate-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 px-3 py-1 rounded-lg border border-slate-200/80 dark:border-gray-700 shadow-2xs">
                                 {timeStr}
+                              </span>
+                              <span className="text-[11px] font-mono font-medium text-slate-500 dark:text-gray-400">
+                                • {relativeStr}
                               </span>
                               {upd.title && (
                                 <span className="font-extrabold text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-900/50 px-3.5 py-1 rounded-full uppercase tracking-wide shadow-2xs">

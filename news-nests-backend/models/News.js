@@ -186,6 +186,14 @@ const newsSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    aiSummaryGenerated: {
+      type: Boolean,
+      default: false,
+    },
+    aiSummaryGeneratedAt: {
+      type: Date,
+      default: null,
+    },
     keyTakeaways: [
       {
         type: String,
@@ -247,6 +255,15 @@ newsSchema.index(
   }
 );
 
+newsSchema.index(
+  { title: 'text', tags: 'text', subtitle: 'text' },
+  {
+    weights: { title: 10, tags: 5, subtitle: 2 },
+    name: 'news_text_search',
+    default_language: 'none',
+    language_override: 'none'
+  }
+);
 newsSchema.index({ status: 1, category: 1, publishedAt: -1, createdAt: -1 });
 newsSchema.index({ status: 1, country: 1, region: 1, city: 1, publishedAt: -1 });
 newsSchema.index({ sourceUrl: 1 }, { unique: true, sparse: true });

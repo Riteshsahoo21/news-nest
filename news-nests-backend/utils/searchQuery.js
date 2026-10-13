@@ -119,7 +119,11 @@ export const buildFlexibleSearchRegex = (value = '') => {
   return new RegExp(escapeRegExp(clean), 'iu');
 };
 
-export const buildLiteralSearchRegex = buildFlexibleSearchRegex;
+export const buildLiteralSearchRegex = (value = '') => {
+  const clean = value.trim();
+  if (!clean) return new RegExp('', 'i');
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(clean)}(?=$|[^\\p{L}\\p{N}])`, 'iu');
+};
 
 export const normalizeSearchQuery = (value) => {
   if (typeof value !== 'string') return '';

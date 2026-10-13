@@ -1,4 +1,5 @@
 {
+  "id": "UmruneY2eQdth8NW",
   "name": "News Nest 2 - Zero Touch Live Sports Feeder",
   "nodes": [
     {
@@ -45,7 +46,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs/upsert-fixture' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/live-blogs/upsert-fixture' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -91,7 +92,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs?isLive=true&limit=100' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/live-blogs?isLive=true&limit=100' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -148,7 +149,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/live-blogs/sync-score/' + encodeURIComponent($json.externalMatchId) }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/live-blogs/sync-score/' + encodeURIComponent($json.externalMatchId) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -203,12 +204,14 @@
       "main": [[{"node": "Sync Score and Commentary", "type": "main", "index": 0}]]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "timezone": "Asia/Kolkata",
     "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "none"
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
   },
   "versionId": "2f94afdb-347b-4b52-bc52-63a4f7a09e65",
   "meta": {

@@ -97,10 +97,10 @@ const extractCompleteArticle = async (article, { timeoutMs = 45000 } = {}) => {
     const sourceName = String(article.sourceName || '').trim();
     const extractedAuthor = String(extracted.author || '').trim();
     const author = extractedAuthor && extractedAuthor !== 'News Desk' ? extractedAuthor : sourceName;
-    const aiSummary = cleanArticleText(extracted.aiSummary || '');
-    const keyTakeaways = Array.isArray(extracted.keyTakeaways)
-      ? extracted.keyTakeaways.map((item) => cleanArticleText(item)).filter(Boolean).slice(0, 5)
-      : [];
+    // Do NOT auto-populate aiSummary or keyTakeaways on automated ingest; generated strictly on-demand
+    const aiSummary = '';
+    const keyTakeaways = [];
+    const metaDescText = cleanArticleText(article.summary || article.subtitle || content);
     const tags = Array.from(new Set([
       ...(Array.isArray(extracted.tags) ? extracted.tags : []),
       ...generateTags(article.title, content, article.category)
@@ -137,7 +137,7 @@ const extractCompleteArticle = async (article, { timeoutMs = 45000 } = {}) => {
       aiSummary,
       keyTakeaways,
       tags,
-      metaDescription: aiSummary.slice(0, 300),
+      metaDescription: metaDescText.slice(0, 300),
       seoTitle: cleanArticleText(article.title).slice(0, 120),
       isFeaturedOnHome: Boolean(
         article.isFeaturedOnHome !== false &&
@@ -322,6 +322,15 @@ export const syncMetadataFeeds = async (options = {}) => {
           result.article.tags.unshift('esports');
         }
 
+        const footballKeywords = /\b(football|soccer|premier league|champions league|uefa|fifa|la liga|serie a|bundesliga|arsenal|chelsea|liverpool|manchester united|manchester city|real madrid|barcelona|bayern|psg|juventus|tottenham|haaland|mbappe|messi|ronaldo|striker|goalkeeper|nations league)\b/i;
+        const titleAndContent = `${result.article.title || ''} ${result.article.subtitle || ''} ${(result.article.tags || []).join(' ')}`;
+        if (result.article.category === 'sports' && (result.article.subCategory === 'football' || footballKeywords.test(titleAndContent))) {
+          result.article.subCategory = 'football';
+          if (!result.article.tags.includes('football')) {
+            result.article.tags.unshift('football');
+          }
+        }
+
         if (existing) {
           await News.updateOne({ _id: existing._id }, { $set: result.article });
           updatedCount++;
@@ -455,8 +464,8 @@ export const getFullArticleContent = async (articleDoc) => {
           content: cleanedBody,
           author: (extracted.author && extracted.author !== 'News Desk') ? extracted.author : (articleDoc.author || articleDoc.sourceName),
           readTime: extracted.readTime || articleDoc.readTime,
-          aiSummary: extracted.aiSummary || articleDoc.aiSummary || '',
-          keyTakeaways: (extracted.keyTakeaways && extracted.keyTakeaways.length > 0) ? extracted.keyTakeaways : (articleDoc.keyTakeaways || []),
+          aiSummary: articleDoc.aiSummary || '',
+          keyTakeaways: articleDoc.keyTakeaways || [],
           isFullContentFetched: Boolean(cleanedBody.length >= 350),
           imageUrl: resolvedImg,
           mainImageUrl: resolvedImg,

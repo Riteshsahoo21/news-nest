@@ -98,10 +98,9 @@ async def extract_url_content(payload: ExtractUrlRequest):
             country=payload.country
         )
 
-        # Generate AI summary & key takeaways for the extracted text
-        summary_result = await generate_ai_summary(article_result.content, title=article_result.title)
-        article_result.aiSummary = summary_result.get("executiveSummary", "")
-        article_result.keyTakeaways = summary_result.get("keyTakeaways", [])
+        # Do NOT auto-generate AI summary on extract to save API credits. Generated strictly on-demand in UI.
+        article_result.aiSummary = ""
+        article_result.keyTakeaways = []
 
         return article_result
     except Exception as e:

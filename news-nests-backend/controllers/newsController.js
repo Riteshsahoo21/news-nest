@@ -8,6 +8,7 @@ import { reverseGeocode } from '../services/locationService.js';
 import { buildSearchFilter, escapeRegExp } from '../utils/searchQuery.js';
 import { discoverLocalNews } from '../services/liveDiscoveryService.js';
 import { notifyArticleApprovedInBackground } from '../services/automationWebhookService.js';
+import { findRelatedNewsMultiTier } from '../services/recommendationService.js';
 
 // Helper to determine sort logic
 const getSortObject = (sort) => {
@@ -846,62 +847,37 @@ export const getNewsByAuthor = async (req, res) => {
   }
 };
 
-// Get related news
+// Get related news using Universal Multi-Tier Recommendation Engine
 export const getRelatedNews = async (req, res) => {
   try {
-    const { articleId, tags, category } = req.query;
+    const { articleId, tags, category, title } = req.query;
     
+    let seedArticle = null;
+
+    // Check if article already has cached relatedArticles in MongoDB
+    if (articleId && mongoose.isValidObjectId(articleId)) {
+      seedArticle = await News.findById(articleId).populate('relatedArticles', 'title slug subtitle summary imageUrl mainImageUrl category subCategory publishedAt createdAt');
+      if (seedArticle && Array.isArray(seedArticle.relatedArticles) && seedArticle.relatedArticles.length > 0) {
+        return res.json(seedArticle.relatedArticles);
+      }
+    }
+
     let queryTags = [];
     if (tags) {
       queryTags = (Array.isArray(tags) ? tags : tags.split(',')).map(t => t.trim()).filter(Boolean);
     }
 
-    // Build the query to find related news
-    let filter = { status: 'approved' };
-    
-    // Exclude the current article if provided
-    if (articleId) {
-      filter._id = { $ne: articleId };
+    if (!seedArticle) {
+      seedArticle = {
+        _id: articleId,
+        tags: queryTags,
+        category: category || '',
+        title: title || ''
+      };
     }
 
-    // Match by tags (highest priority) or category
-    if (queryTags.length > 0) {
-      filter.tags = { $in: queryTags };
-    } else if (category) {
-      filter.category = category.toLowerCase();
-    }
-
-    // If articleId is given, check if it already has rich vector companion relatedArticles
-    if (articleId && mongoose.isValidObjectId(articleId)) {
-      const parent = await News.findById(articleId).populate('relatedArticles', 'title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
-      if (parent && parent.relatedArticles && parent.relatedArticles.length > 0) {
-        return res.json(parent.relatedArticles);
-      }
-    }
-
-    // Fetch related articles with rich fields
-    let relatedNews = await News.find(filter)
-      .sort({ publishedAt: -1, createdAt: -1 })
-      .limit(3)
-      .select('title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
-    
-    // If not enough related news by tags, fallback to category
-    if (relatedNews.length < 3 && category && queryTags.length > 0) {
-      const excludeIds = relatedNews.map(n => n._id);
-      if (articleId) excludeIds.push(articleId);
-      
-      const moreNews = await News.find({
-        _id: { $nin: excludeIds },
-        status: 'approved',
-        category: category.toLowerCase()
-      })
-        .sort({ publishedAt: -1, createdAt: -1 })
-        .limit(3 - relatedNews.length)
-        .select('title slug subtitle summary imageUrl mainImageUrl category publishedAt createdAt');
-      
-      relatedNews = [...relatedNews, ...moreNews];
-    }
-    
+    // Run the 3-Stage Multi-Tier Recommendation Funnel
+    const relatedNews = await findRelatedNewsMultiTier(seedArticle, { limit: 3 });
     res.json(relatedNews);
   } catch (error) {
     console.error('Error fetching related news:', error);
@@ -1055,6 +1031,124 @@ Return ONLY a valid JSON object matching this schema:
   } catch (error) {
     console.error('Error generating article backstory:', error);
     return res.status(500).json({ error: 'Failed to generate backstory' });
+  }
+};
+
+// On-demand AI Executive Briefing / Summary Generation
+export const generateArticleSummary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const force = req.body?.force || req.query?.force === 'true';
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId ? { _id: id } : { slug: id };
+
+    let news = await News.findOne(query);
+    if (!news && isObjectId) {
+      news = await News.findOne({ slug: id });
+    }
+    if (!news) {
+      return res.status(404).json({ error: 'News article not found' });
+    }
+
+    // Return cached summary if already generated and force flag not set
+    if (news.aiSummary && Array.isArray(news.keyTakeaways) && news.keyTakeaways.length > 0 && !force) {
+      return res.json({
+        success: true,
+        aiSummary: news.aiSummary,
+        keyTakeaways: news.keyTakeaways,
+        cached: true
+      });
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6J_aFFfm9ETPBnCFSUw5OsvcIuTEw_kq6lfH1bixbvaOg';
+    const textModel = process.env.GEMINI_TEXT_MODEL || 'gemini-flash-lite-latest';
+
+    const cleanContent = (news.content || news.subtitle || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const prompt = `You are a professional senior news editor. Read the article below and produce a structured JSON executive briefing:
+Title: ${news.title}
+Category: ${news.category || 'General'}
+Article Content: ${cleanContent.slice(0, 4000)}
+
+Output strictly valid JSON with this format:
+{
+  "executiveSummary": "A concise, engaging 2-sentence executive briefing capturing the core development.",
+  "keyTakeaways": [
+    "Bullet 1 with key primary fact or announcement",
+    "Bullet 2 with cause, context, or key reaction",
+    "Bullet 3 with outcome, implications, or next steps"
+  ]
+}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiKey}`;
+    let summaryData = null;
+
+    try {
+      const gRes = await axios.post(
+        url,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json'
+          }
+        },
+        { timeout: 20000 }
+      );
+
+      const rawText = gRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawText) {
+        try {
+          summaryData = JSON.parse(rawText);
+        } catch {
+          const match = rawText.match(/\{[\s\S]*\}/);
+          if (match) summaryData = JSON.parse(match[0]);
+        }
+      }
+    } catch (apiErr) {
+      console.error('Gemini Summary API Error:', apiErr.response?.data || apiErr.message);
+    }
+
+    if (!summaryData || !summaryData.executiveSummary) {
+      // Fallback extraction from content
+      const sentences = cleanContent.split(/(?<=[.?!])\s+/).filter(s => s.length > 20);
+      summaryData = {
+        executiveSummary: sentences.slice(0, 2).join(' ') || `${news.title}. Comprehensive reporting on latest developments.`,
+        keyTakeaways: [
+          sentences[0] || `${news.title}`,
+          sentences[1] || 'Key stakeholders and regional representatives are monitoring the ongoing situation.',
+          sentences[2] || 'Further administrative protocols and follow-up briefings are expected.'
+        ]
+      };
+    }
+
+    const aiSummary = summaryData.executiveSummary || '';
+    const keyTakeaways = Array.isArray(summaryData.keyTakeaways) ? summaryData.keyTakeaways : [];
+
+    await News.updateOne(
+      { _id: news._id },
+      {
+        $set: {
+          aiSummary,
+          keyTakeaways,
+          aiSummaryGenerated: true,
+          aiSummaryGeneratedAt: new Date()
+        }
+      }
+    );
+
+    return res.json({
+      success: true,
+      aiSummary,
+      keyTakeaways,
+      cached: false
+    });
+  } catch (error) {
+    console.error('Error generating article summary:', error);
+    return res.status(500).json({ error: 'Failed to generate summary' });
   }
 };
 

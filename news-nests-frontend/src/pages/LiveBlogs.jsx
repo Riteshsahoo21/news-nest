@@ -17,7 +17,9 @@ import {
   ArrowUpRight,
   ShieldAlert,
   MessageCircle,
-  CheckCircle
+  CheckCircle,
+  Search as SearchIcon,
+  X
 } from 'lucide-react';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import LiveBlogDetailModal from '../components/LiveBlogDetailModal';
@@ -28,6 +30,7 @@ export default function LiveBlogs() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeBlogId, setActiveBlogId] = useState(routeId || searchParams.get('id') || null);
   const [isModalOpen, setIsModalOpen] = useState(!!(routeId || searchParams.get('id')));
@@ -131,9 +134,62 @@ export default function LiveBlogs() {
 
   const currentTabBlogs = statusTab === 'live' ? activeBlogsList : concludedBlogsList;
 
-  const filteredBlogs = selectedCategory === 'All'
+  // Flexible category filtering across Sports, Football, Cricket, and custom topics
+  const categoryFilteredBlogs = selectedCategory === 'All'
     ? currentTabBlogs
-    : currentTabBlogs.filter(b => b.category?.toLowerCase() === selectedCategory.toLowerCase());
+    : currentTabBlogs.filter(b => {
+        const catLower = (b.category || '').toLowerCase();
+        const tagsLower = Array.isArray(b.tags) ? b.tags.map(t => String(t).toLowerCase()) : [];
+        const combinedText = `${b.title || ''} ${b.description || ''} ${b.matchStatus?.matchInfo || ''}`.toLowerCase();
+
+        if (selectedCategory === 'Sports') {
+          return catLower === 'sports' || catLower === 'cricket' || catLower === 'football' || tagsLower.includes('sports');
+        }
+        if (selectedCategory === 'Football') {
+          return catLower === 'football' || tagsLower.includes('football') || tagsLower.includes('soccer') ||
+            /\b(football|soccer|premier league|champions league|uefa|fifa|la liga|serie a|arsenal|chelsea|liverpool|manchester|real madrid|barcelona)\b/i.test(combinedText);
+        }
+        if (selectedCategory === 'Cricket') {
+          return catLower === 'cricket' || tagsLower.includes('cricket') ||
+            /\b(cricket|test|odi|t20|cricbuzz|ipl|bcci|icc|u19|wicket|over|innings)\b/i.test(combinedText) ||
+            (b.externalMatchId && b.externalMatchId.startsWith('cric_'));
+        }
+        return catLower === selectedCategory.toLowerCase() || tagsLower.includes(selectedCategory.toLowerCase());
+      });
+
+  // Dynamic Real-Time Search Query Filter (Searches "everytime" the user types)
+  const filteredBlogs = !searchQuery.trim()
+    ? categoryFilteredBlogs
+    : categoryFilteredBlogs.filter(b => {
+        const q = searchQuery.toLowerCase().trim();
+        const title = (b.title || '').toLowerCase();
+        const desc = (b.description || '').toLowerCase();
+        const cat = (b.category || '').toLowerCase();
+        const author = (b.author || '').toLowerCase();
+        const t1Name = (b.matchStatus?.team1?.name || '').toLowerCase();
+        const t2Name = (b.matchStatus?.team2?.name || '').toLowerCase();
+        const matchInfo = (b.matchStatus?.matchInfo || '').toLowerCase();
+        const tags = Array.isArray(b.tags) ? b.tags.join(' ').toLowerCase() : '';
+        const customStats = Array.isArray(b.matchStatus?.customStats)
+          ? b.matchStatus.customStats.map(s => `${s.label} ${s.value}`).join(' ').toLowerCase()
+          : '';
+        const updatesText = Array.isArray(b.updates)
+          ? b.updates.slice(0, 15).map(u => `${u.title} ${u.content}`).join(' ').toLowerCase()
+          : '';
+
+        return (
+          title.includes(q) ||
+          desc.includes(q) ||
+          cat.includes(q) ||
+          author.includes(q) ||
+          t1Name.includes(q) ||
+          t2Name.includes(q) ||
+          matchInfo.includes(q) ||
+          tags.includes(q) ||
+          customStats.includes(q) ||
+          updatesText.includes(q)
+        );
+      });
 
   const getTimeElapsed = (dateString) => {
     if (!dateString) return 'Just now';
@@ -243,6 +299,41 @@ export default function LiveBlogs() {
               </button>
             ))}
           </div>
+
+          {/* Real-time Live Coverage Search Bar */}
+          <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-800/80">
+            <div className="relative flex-1 max-w-md">
+              <SearchIcon className="w-4 h-4 text-slate-400 dark:text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search live matches, teams, venues, or commentary..."
+                className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-slate-50 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-gray-500 shadow-2xs focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {searchQuery.trim() && (
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-500 dark:text-gray-400">
+                <span>Found <strong className="text-red-600 dark:text-red-400">{sortedBlogs.length}</strong> matching "{searchQuery}"</span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-red-600 dark:text-red-400 hover:underline cursor-pointer ml-1"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -260,21 +351,32 @@ export default function LiveBlogs() {
           <div className="bg-white dark:bg-[#111827] rounded-3xl border border-gray-200 dark:border-gray-800 p-16 text-center max-w-xl mx-auto my-12 shadow-md">
             <Radio className="w-16 h-16 text-red-600/30 dark:text-red-500/30 mx-auto mb-5 animate-pulse" />
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white font-serif mb-2">
-              {statusTab === 'live' ? 'No Active Live Streams' : 'No Concluded Events Found'}
+              {searchQuery.trim() 
+                ? `No live coverage found for "${searchQuery}"`
+                : statusTab === 'live' ? 'No Active Live Streams' : 'No Concluded Events Found'}
             </h3>
             <p className="text-sm text-slate-600 dark:text-gray-300 mb-6 leading-relaxed">
-              {statusTab === 'live' 
-                ? 'All live broadcasts have concluded. Our autonomous scanner monitors outside world cricket, sports, and breaking feeds continuously every 60 seconds.'
-                : 'No archived events found matching this topic filter.'}
+              {searchQuery.trim()
+                ? 'Try searching by a different team name (e.g. India, Australia, Arsenal), tournament, or stadium.'
+                : statusTab === 'live' 
+                  ? 'All live broadcasts have concluded. Our autonomous scanner monitors outside world cricket, sports, and breaking feeds continuously every 60 seconds.'
+                  : 'No archived events found matching this topic filter.'}
             </p>
-            {statusTab === 'live' && concludedBlogsList.length > 0 && (
+            {searchQuery.trim() ? (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider px-8 py-3 rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                Clear Search
+              </button>
+            ) : (statusTab === 'live' && concludedBlogsList.length > 0) ? (
               <button
                 onClick={() => setStatusTab('archive')}
                 className="bg-slate-900 dark:bg-red-600 hover:bg-slate-800 dark:hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider px-8 py-3 rounded-xl transition-all shadow-sm"
               >
                 View Concluded Coverage ({concludedBlogsList.length})
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="space-y-6">

@@ -14,7 +14,7 @@ const canManageLiveBlog = async (userId) => {
   return false;
 };
 
-import { isMatchOrStreamEnded } from '../services/liveBlogAutomationService.js';
+import { isMatchOrStreamEnded, pruneConcludedLiveBlogs } from '../services/liveBlogAutomationService.js';
 
 // Get all live blogs (by default only active live blogs, or filtered by status)
 export const getAllLiveBlogs = async (req, res) => {
@@ -25,7 +25,7 @@ export const getAllLiveBlogs = async (req, res) => {
     if (status === 'ended') {
       query.isLive = false;
     } else if (status === 'all') {
-      // Return both active and ended for studio/admin management
+      // Return both active and concluded
     } else {
       // Default: ONLY active live blogs and active streams
       query.isLive = true;
@@ -44,12 +44,42 @@ export const getAllLiveBlogs = async (req, res) => {
       for (const blog of liveBlogs) {
         if (isMatchOrStreamEnded(blog)) {
           // Concluded match or ended stream -> mark false in DB
-          LiveBlog.updateOne({ _id: blog._id }, { $set: { isLive: false } }).catch(() => {});
+          LiveBlog.updateOne({ _id: blog._id }, { $set: { isLive: false } })
+            .then(() => pruneConcludedLiveBlogs(5))
+            .catch(() => {});
         } else {
           activeOnly.push(blog);
         }
       }
       return res.json(activeOnly);
+    }
+
+    // If status === 'all', return all active blogs + strictly at most 5 latest concluded archives
+    if (status === 'all') {
+      const active = [];
+      const concluded = [];
+      for (const blog of liveBlogs) {
+        if (blog.isLive && !isMatchOrStreamEnded(blog)) {
+          active.push(blog);
+        } else {
+          concluded.push(blog);
+        }
+      }
+      // Strictly keep at most 5 concluded blogs
+      const limitedConcluded = concluded.slice(0, 5);
+      if (concluded.length > 5) {
+        pruneConcludedLiveBlogs(5).catch(() => {});
+      }
+      return res.json([...active, ...limitedConcluded]);
+    }
+
+    // If status === 'ended', return strictly at most 5 latest concluded blogs
+    if (status === 'ended') {
+      const limited = liveBlogs.slice(0, 5);
+      if (liveBlogs.length > 5) {
+        pruneConcludedLiveBlogs(5).catch(() => {});
+      }
+      return res.json(limited);
     }
 
     res.json(liveBlogs);

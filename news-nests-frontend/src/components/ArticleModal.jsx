@@ -97,10 +97,11 @@ export default function ArticleModal({ articleId, onClose }) {
           if (art.relatedArticles && art.relatedArticles.length > 0) {
             setRelatedNews(art.relatedArticles);
           } else {
-            const { category, tags, _id } = art;
+            const { category, tags, title, _id } = art;
             let queryUrl = `/news/related?articleId=${_id}`;
-            if (category) queryUrl += `&category=${category}`;
-            if (tags && tags.length > 0) queryUrl += `&tags=${tags.join(',')}`;
+            if (category) queryUrl += `&category=${encodeURIComponent(category)}`;
+            if (tags && tags.length > 0) queryUrl += `&tags=${encodeURIComponent(tags.join(','))}`;
+            if (title) queryUrl += `&title=${encodeURIComponent(title)}`;
             
             try {
               const relatedRes = await api.get(queryUrl);
@@ -550,8 +551,10 @@ export default function ArticleModal({ articleId, onClose }) {
                 ) : null}
 
                 <AiSummaryCard
+                  articleId={article.slug || article._id || articleId}
                   aiSummary={article.aiSummary}
                   keyTakeaways={article.keyTakeaways}
+                  aiSummaryGenerated={article.aiSummaryGenerated}
                   className="mb-6"
                 />
 

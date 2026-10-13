@@ -1,4 +1,5 @@
 {
+  "id": "pcOtH5y52Sv9tdtj",
   "name": "News Nest 1 - Semantic Backstory and Crosslinks",
   "nodes": [
     {
@@ -11,7 +12,7 @@
       "name": "Article Approved Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [-1040, -120],
+      "position": [-900, -120],
       "webhookId": "467a5d3a-a7bd-4930-a2b0-5bde54ad883f"
     },
     {
@@ -29,11 +30,11 @@
       "name": "Backfill Every 10 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-1040, 120]
+      "position": [-900, 120]
     },
     {
       "parameters": {
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/news/semantic-pending?limit=10' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/news/semantic-pending?limit=10' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -48,10 +49,10 @@
         }
       },
       "id": "7b22b824-e9c7-44d8-b930-32ec1e24ea9e",
-      "name": "Fetch Unembedded Articles",
+      "name": "Fetch Unlinked Articles",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-820, 120]
+      "position": [-680, 120]
     },
     {
       "parameters": {
@@ -61,208 +62,45 @@
       "name": "Expand Semantic Queue",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-600, 120]
+      "position": [-460, 120]
     },
     {
       "parameters": {
-        "jsCode": "const expectedKey = String($env.N8N_AUTOMATION_KEY || '');\nconst validItems = [];\n$input.all().forEach((item, index) => {\n  const envelope = item.json || {};\n  if (envelope.body) {\n    const suppliedKey = String(envelope.headers?.['x-automation-key'] || envelope.headers?.['X-Automation-Key'] || '');\n    if (!expectedKey || suppliedKey !== expectedKey) throw new Error('Unauthorized article webhook request');\n  }\n  const source = envelope.body || envelope.article || envelope;\n  const articleId = String(source.articleId || source._id || '');\n  if (!/^[a-f0-9]{24}$/i.test(articleId)) return;\n  const title = String(source.title || '').trim();\n  if (!title) return;\n  let content = String(source.content || '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();\n  if (content.length < 100) {\n    content = `${title}. ${String(source.subtitle || '')}. ${String(source.aiSummary || '')}. ${content}`.trim();\n  }\n  validItems.push({\n    json: {\n      articleId,\n      title,\n      subtitle: String(source.subtitle || ''),\n      content,\n      category: String(source.category || 'general'),\n      tags: Array.isArray(source.tags) ? source.tags : [],\n      slug: String(source.slug || ''),\n      aiSummary: String(source.aiSummary || ''),\n      publishedAt: source.publishedAt || source.createdAt || new Date().toISOString(),\n      embeddingText: `${title}\\n\\n${String(source.subtitle || '')}\\n\\n${content.slice(0, 7000)}`\n    },\n    pairedItem: { item: index }\n  });\n});\nreturn validItems;"
+        "jsCode": "const expectedKey = String($env.N8N_AUTOMATION_KEY || '');\nconst validItems = [];\n$input.all().forEach((item, index) => {\n  const envelope = item.json || {};\n  if (envelope.body) {\n    const suppliedKey = String(envelope.headers?.['x-automation-key'] || envelope.headers?.['X-Automation-Key'] || '');\n    if (!expectedKey || suppliedKey !== expectedKey) throw new Error('Unauthorized article webhook request');\n  }\n  const source = envelope.body || envelope.article || envelope;\n  const articleId = String(source.articleId || source._id || '');\n  if (!/^[a-f0-9]{24}$/i.test(articleId)) return;\n  const title = String(source.title || '').trim();\n  if (!title) return;\n  const tags = Array.isArray(source.tags) ? source.tags : [];\n  validItems.push({\n    json: {\n      articleId,\n      title,\n      subtitle: String(source.subtitle || ''),\n      category: String(source.category || 'general'),\n      tags,\n      slug: String(source.slug || ''),\n      aiSummary: String(source.aiSummary || ''),\n      publishedAt: source.publishedAt || source.createdAt || new Date().toISOString()\n    },\n    pairedItem: { item: index }\n  });\n});\nreturn validItems;"
       },
       "id": "64d99c1a-b0f9-48a2-97bb-86c3eaf350e3",
       "name": "Normalize Article",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-360, -20]
+      "position": [-220, -20]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2') + ':embedContent' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-goog-api-key",
-              "value": "={{$env.GEMINI_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { content: { parts: [{ text: $json.embeddingText }] }, task_type: 'RETRIEVAL_DOCUMENT', title: $json.title, output_dimensionality: 768 } }}",
-        "options": {
-          "timeout": 60000
-        }
-      },
-      "id": "8f460bc0-2fc9-44a4-9a4d-624a26cd680f",
-      "name": "Gemini 768d Embedding",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [-120, -20]
-    },
-    {
-      "parameters": {
-        "jsCode": "const originals = $('Normalize Article').all();\nreturn $input.all().map((item, index) => {\n  const source = originals[index]?.json || originals[0]?.json;\n  const vector = item.json.embedding?.values || item.json.embeddings?.[0]?.values || [];\n  if (!Array.isArray(vector) || vector.length !== 768) throw new Error(`Expected a 768-dimensional embedding, received ${vector.length}`);\n  const hex = source.articleId.toLowerCase();\n  const pointId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}00000000`;\n  return { json: { ...source, vector, pointId }, pairedItem: { item: index } };\n});"
-      },
-      "id": "f756d114-c6a0-4f84-93fd-55ece042e239",
-      "name": "Prepare Vector",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [120, -20]
-    },
-    {
-      "parameters": {
-        "method": "PUT",
-        "url": "={{ ($env.QDRANT_URL || 'http://host.docker.internal:6333') + '/collections/' + ($env.QDRANT_COLLECTION || 'news_nest_articles') }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "={{$env.QDRANT_API_KEY || ''}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { vectors: { size: 768, distance: 'Cosine' } } }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/news/related?articleId=' + $json.articleId + '&category=' + encodeURIComponent($json.category) + '&tags=' + encodeURIComponent($json.tags.join(',')) + '&title=' + encodeURIComponent($json.title) }}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "15aeb44e-e7dc-49b7-a4f7-3b718e3bebc0",
-      "name": "Ensure Qdrant Collection",
+      "id": "f5120d58-95a7-47b2-bdcb-65231c6a2871",
+      "name": "Resolve Multi-Tier Companions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [360, -20],
-      "continueOnFail": true
+      "position": [40, -20]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ ($env.QDRANT_URL || 'http://host.docker.internal:6333') + '/collections/' + ($env.QDRANT_COLLECTION || 'news_nest_articles') + '/points/query' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "={{$env.QDRANT_API_KEY || ''}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { query: $('Prepare Vector').item.json.vector, filter: { must_not: [{ key: 'articleId', match: { value: $('Prepare Vector').item.json.articleId } }] }, limit: 5, with_payload: true } }}",
-        "options": {
-          "timeout": 30000
-        }
+        "jsCode": "const sourceList = $('Normalize Article').all();\nreturn $input.all().map((item, index) => {\n  const source = sourceList[index]?.json || sourceList[0]?.json || {};\n  const rawMatches = Array.isArray(item.json) ? item.json : (item.json?.relatedArticles || []);\n  const relatedIds = rawMatches\n    .map((m) => String(m._id || m.articleId || ''))\n    .filter((id) => /^[a-f0-9]{24}$/i.test(id) && id !== source.articleId)\n    .slice(0, 3);\n  return {\n    json: {\n      articleId: source.articleId,\n      relatedArticles: relatedIds,\n      isDuplicateEcho: false,\n      embeddingId: 'mongo_multitier_' + source.articleId\n    },\n    pairedItem: { item: index }\n  };\n});"
       },
-      "id": "a53841af-a81c-41b2-9990-592a1253a42a",
-      "name": "Find Semantic Neighbours",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [600, -20]
-    },
-    {
-      "parameters": {
-        "jsCode": "const preparedItems = $('Prepare Vector').all();\nreturn $input.all().map((item, index) => {\n  const source = preparedItems[index]?.json || preparedItems[0]?.json;\n  const points = Array.isArray(item.json.result?.points) ? item.json.result.points : (Array.isArray(item.json.result) ? item.json.result : []);\n  const duplicate = points.some((point) => Number(point.score || 0) > 0.92);\n  const related = points\n    .filter((point) => Number(point.score || 0) >= 0.75 && Number(point.score || 0) <= 0.92 && point.payload?.articleId)\n    .slice(0, 3);\n  const context = related.slice(0, 2).map((point, contextIndex) => {\n    const payload = point.payload || {};\n    return `Past article ${contextIndex + 1}: ${payload.title || ''}\\n${payload.summary || ''}`;\n  }).join('\\n\\n');\n  const prompt = related.length\n    ? `Current article: ${source.title}\\n${source.aiSummary || source.subtitle || source.content.slice(0, 900)}\\n\\nVerified related archive:\\n${context}\\n\\nWrite exactly two concise, factual sentences explaining the historical context. Use only the supplied material. Start with \"The Backstory:\". Do not invent dates, people, or events.`\n    : '';\n  return {\n    json: {\n      ...source,\n      isDuplicateEcho: duplicate,\n      relatedArticles: related.map((point) => String(point.payload.articleId)),\n      backstoryPrompt: prompt,\n      hasRelatedContext: related.length > 0\n    },\n    pairedItem: { item: index }\n  };\n});"
-      },
-      "id": "065574b8-d08c-460d-912c-b2ce0bfe2587",
-      "name": "Classify Similarity",
+      "id": "cf64560b-85d7-4be7-a9a7-4b726cf94a46",
+      "name": "Prepare Semantic Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [840, -20]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.hasRelatedContext ? ('https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash') + ':generateContent') : (($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/health') }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-goog-api-key",
-              "value": "={{$env.GEMINI_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.hasRelatedContext ? { contents: [{ parts: [{ text: $json.backstoryPrompt }] }], generationConfig: { temperature: 0.15, maxOutputTokens: 180 } } : {} }}",
-        "options": {
-          "timeout": 60000
-        }
-      },
-      "continueOnFail": true,
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000,
-      "id": "91ab32b7-488d-48d6-bead-426967678b71",
-      "name": "Generate The Backstory",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1080, -20]
-    },
-    {
-      "parameters": {
-        "jsCode": "const classifiedItems = $('Classify Similarity').all();\nreturn $input.all().map((item, index) => {\n  const source = classifiedItems[index]?.json || classifiedItems[0]?.json;\n  const parts = item.json?.candidates?.[0]?.content?.parts || [];\n  const generated = parts.map((part) => part.text || '').join(' ').trim();\n  const backstory = source.hasRelatedContext && generated && generated.toLowerCase() !== 'empty string' ? generated.slice(0, 2000) : '';\n  return { json: { ...source, backstory }, pairedItem: { item: index } };\n});"
-      },
-      "id": "0e4eecaa-165f-47d9-83e4-081db359f911",
-      "name": "Finalize Semantic Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1320, -20]
+      "position": [280, -20]
     },
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ ($env.QDRANT_URL || 'http://host.docker.internal:6333') + '/collections/' + ($env.QDRANT_COLLECTION || 'news_nest_articles') + '/points?wait=true' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "={{$env.QDRANT_API_KEY || ''}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { points: [{ id: $json.pointId, vector: $json.vector, payload: { articleId: $json.articleId, title: $json.title, slug: $json.slug, category: $json.category, summary: ($json.aiSummary || $json.subtitle || $json.content.slice(0, 700)), publishedAt: $json.publishedAt } }] } }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "id": "3c89c408-143d-4f1f-9628-a0996bd654b6",
-      "name": "Upsert Article Vector",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1560, -20]
-    },
-    {
-      "parameters": {
-        "method": "PUT",
-        "url": "={{ ($env.NEWS_NEST_API_URL || 'http://host.docker.internal:5000') + '/api/automation/news/' + $('Finalize Semantic Data').item.json.articleId + '/semantic' }}",
+        "url": "={{ ($env.NEWS_NEST_API_URL || 'https://news.ritzla.in') + '/api/automation/news/' + $json.articleId + '/semantic' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -278,70 +116,47 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { backstory: $('Finalize Semantic Data').item.json.backstory, relatedArticles: $('Finalize Semantic Data').item.json.relatedArticles, isDuplicateEcho: $('Finalize Semantic Data').item.json.isDuplicateEcho, embeddingId: $('Finalize Semantic Data').item.json.pointId } }}",
+        "jsonBody": "={{ { relatedArticles: $json.relatedArticles, isDuplicateEcho: $json.isDuplicateEcho, embeddingId: $json.embeddingId } }}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "7a80fedc-ebaa-41b0-aa64-bb3f504a24a4",
-      "name": "Save Backstory and Links",
+      "id": "4b54e7d4-e6df-40ec-8367-fa6d2745cb57",
+      "name": "Save Links and Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1800, -20]
+      "position": [520, -20]
     }
   ],
-  "pinData": {},
   "connections": {
     "Article Approved Webhook": {
       "main": [[{"node": "Normalize Article", "type": "main", "index": 0}]]
     },
     "Backfill Every 10 Minutes": {
-      "main": [[{"node": "Fetch Unembedded Articles", "type": "main", "index": 0}]]
+      "main": [[{"node": "Fetch Unlinked Articles", "type": "main", "index": 0}]]
     },
-    "Fetch Unembedded Articles": {
+    "Fetch Unlinked Articles": {
       "main": [[{"node": "Expand Semantic Queue", "type": "main", "index": 0}]]
     },
     "Expand Semantic Queue": {
       "main": [[{"node": "Normalize Article", "type": "main", "index": 0}]]
     },
     "Normalize Article": {
-      "main": [[{"node": "Gemini 768d Embedding", "type": "main", "index": 0}]]
+      "main": [[{"node": "Resolve Multi-Tier Companions", "type": "main", "index": 0}]]
     },
-    "Gemini 768d Embedding": {
-      "main": [[{"node": "Prepare Vector", "type": "main", "index": 0}]]
+    "Resolve Multi-Tier Companions": {
+      "main": [[{"node": "Prepare Semantic Payload", "type": "main", "index": 0}]]
     },
-    "Prepare Vector": {
-      "main": [[{"node": "Ensure Qdrant Collection", "type": "main", "index": 0}]]
-    },
-    "Ensure Qdrant Collection": {
-      "main": [[{"node": "Find Semantic Neighbours", "type": "main", "index": 0}]]
-    },
-    "Find Semantic Neighbours": {
-      "main": [[{"node": "Classify Similarity", "type": "main", "index": 0}]]
-    },
-    "Classify Similarity": {
-      "main": [[{"node": "Generate The Backstory", "type": "main", "index": 0}]]
-    },
-    "Generate The Backstory": {
-      "main": [[{"node": "Finalize Semantic Data", "type": "main", "index": 0}]]
-    },
-    "Finalize Semantic Data": {
-      "main": [[{"node": "Upsert Article Vector", "type": "main", "index": 0}]]
-    },
-    "Upsert Article Vector": {
-      "main": [[{"node": "Save Backstory and Links", "type": "main", "index": 0}]]
+    "Prepare Semantic Payload": {
+      "main": [[{"node": "Save Links and Status", "type": "main", "index": 0}]]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "Asia/Kolkata",
     "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "none"
-  },
-  "versionId": "62542989-8d87-4c1a-b048-68c6c510061c",
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
-  "tags": []
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  }
 }

@@ -189,32 +189,71 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
     team1 = {"name": full_t1, "score": ""}
     team2 = {"name": full_t2, "score": ""}
 
-    # Parse scores from meta tag: "Follow IND 300/2 (41.4) vs WI 295/7 (Virat Kohli..."
-    m_score = re.search(r"Follow\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)\s+vs\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)", meta_desc, re.IGNORECASE)
-    if m_score:
-        c1, s1, c2, s2 = m_score.groups()
-        resolved_1 = _resolve_team_name(_clean(c1), full_t1, full_t2)
-        resolved_2 = _resolve_team_name(_clean(c2), full_t1, full_t2)
-        if resolved_1 == full_t1 or (resolved_1 and resolved_2 == full_t2):
-            team1["name"] = resolved_1 or full_t1
-            team1["score"] = _clean(s1)
-            team2["name"] = resolved_2 or full_t2
-            team2["score"] = _clean(s2)
-        else:
-            team1["name"] = resolved_2 or full_t1
-            team1["score"] = _clean(s2)
-            team2["name"] = resolved_1 or full_t2
-            team2["score"] = _clean(s1)
+    # 1. Parse live scores from HTML DOM (avoids stale CDN meta description)
+    score_col = soup.find('div', class_=re.compile(r'flex-col\s+gap-0'))
+    if score_col:
+        rows = score_col.find_all('div', class_=re.compile(r'justify-between\s+items-end'))
+        parsed_teams = []
+        for r in rows:
+            inner_flex = r.find('div', class_=re.compile(r'flex-row\s+(?:font-bold|font-light)'))
+            if inner_flex:
+                children = inner_flex.find_all('div', recursive=False)
+                if len(children) >= 2:
+                    t_name = children[0].get_text().strip()
+                    raw_score = children[1].get_text(" ", strip=True)
+                    clean_score = re.sub(r'\s*/\s*', '/', raw_score)
+                    clean_score = re.sub(r'\s*\(\s*', ' (', clean_score)
+                    clean_score = re.sub(r'\s+', ' ', clean_score).strip()
+                    parsed_teams.append((t_name, clean_score))
+        
+        for s_name, s_score in parsed_teams:
+            s_lower = s_name.lower().replace(' ', '')
+            if any(w in s_lower for w in ['ind', 'india']):
+                team1["name"] = full_t1 or s_name
+                team1["score"] = s_score
+            elif any(w in s_lower for w in ['aus', 'australia']):
+                team2["name"] = full_t2 or s_name
+                team2["score"] = s_score
+            else:
+                if not team1["score"]:
+                    team1["name"] = s_name
+                    team1["score"] = s_score
+                else:
+                    team2["name"] = s_name
+                    team2["score"] = s_score
 
-    # Status & Result
+    # Fallback to meta tag if DOM score was not found
+    if not team1["score"] and not team2["score"]:
+        m_score = re.search(r"Follow\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)\s+vs\s+([A-Za-z0-9\s]+?)\s+([\d/]+(?:\s*\([\d.]+\))?)", meta_desc, re.IGNORECASE)
+        if m_score:
+            c1, s1, c2, s2 = m_score.groups()
+            resolved_1 = _resolve_team_name(_clean(c1), full_t1, full_t2)
+            resolved_2 = _resolve_team_name(_clean(c2), full_t1, full_t2)
+            if resolved_1 == full_t1 or (resolved_1 and resolved_2 == full_t2):
+                team1["name"] = resolved_1 or full_t1
+                team1["score"] = _clean(s1)
+                team2["name"] = resolved_2 or full_t2
+                team2["score"] = _clean(s2)
+            else:
+                team1["name"] = resolved_2 or full_t1
+                team1["score"] = _clean(s2)
+                team2["name"] = resolved_1 or full_t2
+                team2["score"] = _clean(s1)
+
+    # Status & Result - Prefer live DOM status indicator
     status = ""
-    for el in soup.find_all(["div", "span"]):
-        txt = _clean(el.get_text())
-        if not txt or len(txt) > 90 or el.find(["div"]):
-            continue
-        if STATUS_WORD_REGEX.search(txt):
-            status = txt
-            break
+    status_node = soup.select_one('.text-cbTxtLive, .my-2.text-cbLive, .cb-text-live, .cb-text-stumps')
+    if status_node:
+        status = _clean(status_node.get_text())
+
+    if not status:
+        for el in soup.find_all(["div", "span"]):
+            txt = _clean(el.get_text())
+            if not txt or len(txt) > 90 or el.find(["div"]):
+                continue
+            if STATUS_WORD_REGEX.search(txt):
+                status = txt
+                break
 
     # Venue
     venue = ""
@@ -259,8 +298,9 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
         comm = children[1] if len(children) >= 2 else (children[0] if children else "")
         if comm:
             label = "LIVE UPDATE"
-            if re.match(r"^\d+\.\d+", ball):
-                label = f"Over {ball}"
+            ball_m = re.match(r"^(\d+\.\d)", ball)
+            if ball_m:
+                label = f"Over {ball_m.group(1)}"
             elif ":" in comm[:45]:
                 label = comm.split(":", 1)[0].strip()
             elif "Virat Kohli" in comm[:40]:
@@ -268,10 +308,10 @@ def parse_mobile_live_commentary_html(html: str, external_match_id: str) -> dict
             elif "Stats by" in comm[:40]:
                 label = "Match Statistics"
             elif ball:
-                label = ball
+                label = ball[:15]
 
-            # Stagger timestamps backward so each update has a realistic, distinct time
-            bulletin_time = base_time - datetime.timedelta(minutes=idx * 3 + (idx % 2) * 2)
+            # Assign sequential timestamps for updates
+            bulletin_time = base_time - datetime.timedelta(seconds=idx * 30)
             updates.append({
                 "title": label[:100],
                 "content": comm,

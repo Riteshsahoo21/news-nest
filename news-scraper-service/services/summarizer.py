@@ -84,7 +84,8 @@ def local_nlp_summarize(text: str, title: str = "") -> dict:
 async def gemini_summarize(text: str, title: str = "") -> dict:
     """Calls Google Gemini 1.5 Flash API for natural abstractive summaries."""
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        model = os.getenv("GEMINI_TEXT_MODEL", "gemini-flash-lite-latest")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         prompt = (
             f"You are a professional senior news editor. Read the article below and produce a structured JSON summary:\n"
             f"Title: {title}\n"
@@ -119,7 +120,8 @@ async def gemini_summarize(text: str, title: str = "") -> dict:
     return local_nlp_summarize(text, title)
 
 async def generate_ai_summary(text: str, title: str = "") -> dict:
-    """Generates AI summary using Gemini if configured, or local NLP."""
-    if GEMINI_API_KEY:
-        return await gemini_summarize(text, title)
-    return local_nlp_summarize(text, title)
+    """Returns empty summary by default so scraping never consumes AI API credits."""
+    return {
+        "executiveSummary": "",
+        "keyTakeaways": []
+    }

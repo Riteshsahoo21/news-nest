@@ -284,15 +284,19 @@ export const syncLiveScore = async (req, res) => {
     // Ingest newest updates first
     const now = Date.now();
     for (const [idx, item] of [...incomingUpdates].reverse().entries()) {
-      const content = cleanString(item.content || item, 4000);
-      const title = cleanString(item.title || 'LIVE UPDATE', 200);
-      if (content && !liveBlog.updates.some((u) => u.content === content)) {
+      const rawContent = (item && typeof item === 'object')
+        ? (item.content || item.text || item.description || item.comm || item.bulletin || '')
+        : item;
+      const content = cleanString(rawContent, 4000);
+      const rawTitle = (item && typeof item === 'object') ? (item.title || 'LIVE UPDATE') : 'LIVE UPDATE';
+      const title = cleanString(rawTitle, 200);
+      if (content && content !== '[object Object]' && !liveBlog.updates.some((u) => u.content === content)) {
         const itemDate = item.createdAt
           ? new Date(item.createdAt)
           : new Date(now - (incomingUpdates.length - 1 - idx) * 3 * 60 * 1000);
 
         liveBlog.updates.unshift({
-          title,
+          title: title || 'LIVE UPDATE',
           content,
           createdAt: itemDate
         });

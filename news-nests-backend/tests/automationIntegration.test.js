@@ -31,7 +31,7 @@ const invokeAutomationMiddleware = (providedKey) => {
 };
 
 test('semantic and live automation fields exist in the Mongoose schemas', () => {
-  for (const field of ['backstory', 'relatedArticles', 'isDuplicateEcho', 'embeddingId']) {
+  for (const field of ['backstory', 'relatedArticles', 'isDuplicateEcho', 'embeddingId', 'aiSummary', 'keyTakeaways']) {
     assert.ok(News.schema.path(field), `News schema is missing ${field}`);
   }
   for (const field of ['externalMatchId', 'lastExternalUpdateId']) {

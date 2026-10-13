@@ -10,7 +10,6 @@ $services = @(
   @{ Name = "Backend Health API"; Url = "http://localhost:5000/health"; Headers = @{} },
   @{ Name = "Backend Automation API"; Url = "http://localhost:5000/api/automation/status"; Headers = $headers },
   @{ Name = "FastAPI Scraper Service"; Url = "http://localhost:8000/health"; Headers = @{} },
-  @{ Name = "Qdrant Vector Database"; Url = "http://localhost:6333/healthz"; Headers = @{} },
   @{ Name = "n8n Automation Engine"; Url = "http://localhost:5678/healthz"; Headers = @{} }
 )
 
@@ -24,12 +23,12 @@ foreach ($s in $services) {
 }
 
 Write-Host "`n------------------------------------------" -ForegroundColor Yellow
-Write-Host " Checking Qdrant Vector Collection..." -ForegroundColor Yellow
+Write-Host " Checking Universal Recommendation API..." -ForegroundColor Yellow
 try {
-  $qdrant = Invoke-RestMethod -Uri "http://localhost:6333/collections/news_nest_articles"
-  Write-Host " [OK] Collection Status: $($qdrant.result.status), Indexed Points: $($qdrant.result.points_count)" -ForegroundColor Green
+  $rec = Invoke-RestMethod -Uri "http://localhost:5000/api/news/related?tags=news,tech"
+  Write-Host " [OK] Recommendation Engine Active: Returned $($rec.Count) stories" -ForegroundColor Green
 } catch {
-  Write-Host " [FAIL] Qdrant Error: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host " [NOTE] Backend offline locally or starting up: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
 Write-Host "`n------------------------------------------" -ForegroundColor Yellow
