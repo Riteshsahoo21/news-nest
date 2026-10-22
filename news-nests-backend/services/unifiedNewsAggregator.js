@@ -22,8 +22,6 @@ export const COMPLETE_ARTICLE_FILTER = {
   sourceUrl: { $regex: /^https?:\/\//i },
   sourceName: { $nin: ['', null] },
   publishedAt: { $ne: null },
-  aiSummary: { $nin: ['', null] },
-  'keyTakeaways.0': { $exists: true },
   'mediaUrls.0': { $exists: true },
   $expr: {
     $gte: [

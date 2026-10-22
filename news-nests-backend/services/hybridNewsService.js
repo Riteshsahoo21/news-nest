@@ -48,9 +48,6 @@ export const selectRichestContent = (...values) => values
 export const isCompleteScrapedArticle = (article) => {
   if (!article) return false;
   const content = cleanArticleText(article.content || '');
-  const takeaways = Array.isArray(article.keyTakeaways)
-    ? article.keyTakeaways.filter((item) => typeof item === 'string' && item.trim())
-    : [];
   const imageUrl = typeof article.imageUrl === 'string' ? article.imageUrl.trim() : '';
 
   return Boolean(
@@ -61,9 +58,9 @@ export const isCompleteScrapedArticle = (article) => {
     isHttpUrl(article.sourceUrl) &&
     typeof article.sourceName === 'string' && article.sourceName.trim() &&
     typeof article.author === 'string' && article.author.trim() &&
-    toValidDate(article.publishedAt) &&
-    typeof article.aiSummary === 'string' && article.aiSummary.trim().length >= 40 &&
-    takeaways.length > 0
+    toValidDate(article.publishedAt)
+    // AI summaries and takeaways are generated on demand, so they are not
+    // prerequisites for a scraped article to appear in the home feed.
   );
 };
 
