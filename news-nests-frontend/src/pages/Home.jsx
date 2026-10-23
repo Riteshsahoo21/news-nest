@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import LiveTicker from '../components/home/LiveTicker';
@@ -18,6 +18,7 @@ import { ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isStaff = user?.roles?.some(role => ['admin', 'editor', 'reporter'].includes(role));
   const [selectedRegion, setSelectedRegion] = useState('all');
@@ -26,6 +27,9 @@ export default function Home() {
   const [locationError, setLocationError] = useState('');
   const [locating, setLocating] = useState(false);
   const [localExpanded, setLocalExpanded] = useState(false);
+  const [feedGeneration, setFeedGeneration] = useState(0);
+  const [discoveringNews, setDiscoveringNews] = useState(false);
+  const [discoveryMessage, setDiscoveryMessage] = useState('');
 
   const getLocaleCountry = () => {
     if (typeof navigator === 'undefined') return '';
@@ -76,7 +80,7 @@ export default function Home() {
   };
   
   const { data, isLoading: loading, isError } = useQuery({
-    queryKey: ['news', 'latest', 50, selectedRegion, coordinates?.latitude, coordinates?.longitude],
+    queryKey: ['news', 'latest', 50, selectedRegion, coordinates?.latitude, coordinates?.longitude, feedGeneration],
     queryFn: async () => {
       if (selectedRegion === 'nearby') {
         try {
@@ -91,18 +95,14 @@ export default function Home() {
           });
           return res.data;
         } catch {
-          const fallbackCountry = getLocaleCountry();
-          const fallbackRes = await api.get('/news', {
-            params: { limit: 50, forHome: true, ...(fallbackCountry ? { country: fallbackCountry } : {}) }
-          });
           return {
-            articles: fallbackRes.data.data || fallbackRes.data || [],
-            locationError: 'Exact regional lookup is temporarily unavailable; showing the closest country feed.'
+            articles: [],
+            locationError: 'Local news lookup failed. No country or global stories were added to Near Me.'
           };
         }
       }
 
-      let endpoint = '/news?limit=50&forHome=true';
+      let endpoint = `/news?limit=50&forHome=true&refresh=${feedGeneration}`;
       if (selectedRegion === 'esports') {
         endpoint += '&subCategory=esports';
       } else if (selectedRegion !== 'all') {
@@ -126,7 +126,26 @@ export default function Home() {
   const articles = data?.articles || [];
   const error = isError ? 'Failed to fetch latest news.' : null;
 
-  // Strict quality filter: Home page only displays articles that are fully complete with a real image and substantive text
+  const discoverNews = async () => {
+    setDiscoveringNews(true);
+    setDiscoveryMessage('');
+    try {
+      const response = await api.post('/news/discover');
+      if (!response.data?.success) {
+        throw new Error(response.data?.reason || response.data?.error || 'News discovery failed.');
+      }
+      setDiscoveryMessage(response.data.totalInserted > 0
+        ? `Added ${response.data.totalInserted} news stories. Refreshing the home feed…`
+        : 'No new stories with a real image and enough article text were available.');
+      setFeedGeneration((generation) => generation + 1);
+    } catch (requestError) {
+      setDiscoveryMessage(requestError.response?.data?.reason || requestError.response?.data?.error || requestError.message || 'News discovery failed.');
+    } finally {
+      setDiscoveringNews(false);
+    }
+  };
+
+  // Strict quality filter: Home page only displays articles with a real image and substantive text.
   const isCompleteHomeArticle = (article) => {
     if (!article) return false;
     const rawImg = article.imageUrl || article.coverImage || article.thumbnail;
@@ -195,21 +214,16 @@ export default function Home() {
   const orgSchema = {
     "@context": "https://schema.org",
     "@type": "NewsMediaOrganization",
-    "name": "News Nests",
+    "name": "RitzlaNews",
     "url": window.location.origin,
     "logo": "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600",
-    "description": "Next-generation real-time journalism, live WebRTC interactive streaming, and investigative news repository.",
-    "sameAs": [
-      "https://twitter.com/NewsNests",
-      "https://facebook.com/NewsNests",
-      "https://youtube.com/NewsNests"
-    ]
+    "description": "Real-time journalism, local perspectives, and reporting from around the world."
   };
 
   return (
     <div className="max-w-7xl mx-auto pb-16 md:pb-24 pt-2 md:py-8 px-3.5 sm:px-6 lg:px-8 bg-background overflow-hidden min-w-0">
       <SeoHead 
-        title="News Nests - Real-Time Journalism & Live WebRTC News Streams"
+        title="RitzlaNews - Real-Time Journalism & Live News"
         description="Breaking headline news, interactive live blog coverage, in-depth politics and sports commentary, and community journalism."
         type="website"
         schema={orgSchema}
@@ -251,12 +265,30 @@ export default function Home() {
               )}
             </div>
 
+            {!loading && safeArticles.length === 0 && !isNearbyView && (
+              <div className="mt-5 rounded-xl border border-border bg-card p-5 text-center">
+                <p className="text-sm text-muted-foreground">No news stories with a verified image are available right now.</p>
+                <button
+                  type="button"
+                  onClick={discoverNews}
+                  disabled={discoveringNews}
+                  className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {discoveringNews ? 'Finding news…' : 'Find latest news'}
+                </button>
+                {discoveryMessage && <p className="mt-3 text-xs text-muted-foreground" role="status">{discoveryMessage}</p>}
+              </div>
+            )}
+
             <div className="mt-2.5 sm:mt-3">
               <CategoryPills 
                 selectedCategory="all"
                 onSelectCategory={(cat) => {
                   if (cat._id !== 'all') {
-                    navigate(`/category/${encodeURIComponent(cat.name.toLowerCase())}`);
+                    navigate(`/category/${encodeURIComponent(cat.name.toLowerCase())}`, {
+                      viewTransition: true,
+                      state: { from: location.pathname }
+                    });
                   }
                 }}
               />

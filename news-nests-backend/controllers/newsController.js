@@ -98,7 +98,7 @@ export const getAllNews = async (req, res) => {
       const searchFilter = buildSearchFilter(q, NEWS_SEARCH_FIELDS);
       if (searchFilter) Object.assign(filter, searchFilter);
     } else if (isHomeView) {
-      // Default home view: show verified authentic news with real image and substantive description
+      // Home view: show verified authentic news with a real image and substantive description.
       filter.imageUrl = { 
         $exists: true, 
         $ne: '', 
@@ -166,47 +166,31 @@ export const getAllNews = async (req, res) => {
   }
 };
 
-// Get location-aware news. Exact city/region matches are returned first and
-// then supplemented with country coverage so sparse local feeds never produce
-// an empty home screen.
+// Near Me only returns stories associated with the detected city (or region
+// when a city could not be resolved). It never mixes in country/global news.
 export const getLocalNews = async (req, res) => {
   try {
     const rawLimit = Number.parseInt(req.query.limit, 10);
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 30;
-    const fallbackCountry = typeof req.query.country === 'string'
-      ? req.query.country.trim().toLowerCase().slice(0, 2)
-      : '';
+    const location = await reverseGeocode(req.query.latitude, req.query.longitude);
 
-    let location;
-    try {
-      location = await reverseGeocode(req.query.latitude, req.query.longitude);
-    } catch (error) {
-      if (!fallbackCountry) throw error;
-      location = {
-        latitude: Number(req.query.latitude),
-        longitude: Number(req.query.longitude),
-        city: '',
-        region: '',
-        country: fallbackCountry.toUpperCase(),
-        countryCode: fallbackCountry,
-        label: fallbackCountry.toUpperCase(),
-        approximate: true
-      };
-    }
-
-    const countryCode = (location.countryCode || fallbackCountry || 'global').toLowerCase();
+    const countryCode = (location.countryCode || 'global').toLowerCase();
     const baseFilter = { status: 'approved' };
     if (countryCode !== 'global') {
       baseFilter.country = { $in: [countryCode, 'global'] };
     }
 
-    const placeNames = Array.from(new Set([location.city, location.region].filter(Boolean)));
+    // Prefer the detected city. Use the broader region only when reverse
+    // geocoding could not identify a city.
+    const placeNames = [location.city || location.region].filter(Boolean);
     const placeMatchers = placeNames.map((place) => new RegExp(escapeRegExp(place), 'i'));
     const localSignals = placeMatchers.flatMap((regex) => ([
       { city: { $regex: regex } },
       { region: { $regex: regex } },
       { title: { $regex: regex } },
       { subtitle: { $regex: regex } },
+      { summary: { $regex: regex } },
+      { content: { $regex: regex } },
       { tags: { $regex: regex } }
     ]));
 
@@ -222,7 +206,7 @@ export const getLocalNews = async (req, res) => {
 
     let discovery = { attempted: false };
     const minimumLocalInventory = Math.min(limit, 8);
-    if (exactArticles.length < minimumLocalInventory) {
+    if (placeNames.length > 0 && exactArticles.length < minimumLocalInventory) {
       discovery = await discoverLocalNews(location, {
         country: countryCode,
         limit: Math.min(6, Math.max(3, minimumLocalInventory - exactArticles.length))
@@ -241,33 +225,7 @@ export const getLocalNews = async (req, res) => {
       }
     }
 
-    let remaining = limit - exactArticles.length;
     let nearbyArticles = exactArticles;
-    let countryFallbackCount = 0;
-    let countryArticles = [];
-    if (remaining > 0 && countryCode !== 'global') {
-      countryArticles = await News.find({
-        status: 'approved',
-        country: countryCode,
-        _id: { $nin: exactArticles.map((article) => article._id) }
-      })
-        .sort({ publishedAt: -1, createdAt: -1 })
-        .limit(remaining);
-      nearbyArticles = [...nearbyArticles, ...countryArticles];
-      countryFallbackCount = countryArticles.length;
-      remaining -= countryArticles.length;
-    }
-
-    let globalArticles = [];
-    if (remaining > 0) {
-      globalArticles = await News.find({
-        status: 'approved',
-        _id: { $nin: nearbyArticles.map((article) => article._id) }
-      })
-        .sort({ publishedAt: -1, createdAt: -1 })
-        .limit(remaining);
-      nearbyArticles = [...nearbyArticles, ...globalArticles];
-    }
 
     if (req.query.forHome === 'true') {
       const isComplete = (art) => {
@@ -281,21 +239,22 @@ export const getLocalNews = async (req, res) => {
         return true;
       };
       exactArticles = exactArticles.filter(isComplete);
-      nearbyArticles = nearbyArticles.filter(isComplete);
-      countryArticles = countryArticles.filter(isComplete);
-      globalArticles = globalArticles.filter(isComplete);
+      nearbyArticles = exactArticles;
     }
 
     res.json({
       location,
       articles: nearbyArticles,
       localArticles: exactArticles,
-      fallbackArticles: [...countryArticles, ...globalArticles],
-      countryArticles,
-      globalArticles,
+      fallbackArticles: [],
+      countryArticles: [],
+      globalArticles: [],
       exactMatches: exactArticles.length,
-      fallbackUsed: exactArticles.length < nearbyArticles.length,
-      countryFallbackCount,
+      fallbackUsed: false,
+      countryFallbackCount: 0,
+      locationError: placeNames.length === 0
+        ? 'Could not identify a city or region for your location, so no broader news was shown.'
+        : '',
       discovery
     });
   } catch (error) {

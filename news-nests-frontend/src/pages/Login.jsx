@@ -58,7 +58,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10"></div>
         <img 
           src="/news_dashboard_bg.png" 
-          alt="NewsNest Editorial Dashboard" 
+          alt="RitzlaNews Editorial Dashboard"
           className="absolute inset-0 w-full h-full object-cover opacity-80"
         />
         <div className="relative z-20 flex flex-col justify-end p-12 h-full text-white">

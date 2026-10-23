@@ -554,7 +554,7 @@ export default function SeoManagement() {
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
                             <span className="text-emerald-400 font-mono text-xs uppercase tracking-wider bg-slate-950/80 px-2.5 py-0.5 rounded font-black border border-emerald-500/40">
-                              News Nests • Real-Time Broadcast
+                              RitzlaNews • Real-Time Broadcast
                             </span>
                           </div>
                         </div>
@@ -612,7 +612,7 @@ export default function SeoManagement() {
                     <div className="w-full max-w-md bg-neutral-900 rounded-3xl overflow-hidden border border-neutral-800 p-4 shadow-2xl space-y-3 animate-zoomIn">
                       <div className="flex items-center gap-2 text-neutral-400 text-xs font-medium">
                         <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">N</div>
-                        <span>News Nests</span>
+                        <span>RitzlaNews</span>
                         <span>•</span>
                         <span className="text-amber-400 font-mono text-[11px]">Top Stories Carousel</span>
                       </div>

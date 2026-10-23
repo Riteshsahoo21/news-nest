@@ -52,6 +52,7 @@ export const isCompleteScrapedArticle = (article) => {
 
   return Boolean(
     article.isFullContentFetched &&
+    isHttpUrl(imageUrl) &&
     !imageUrl.includes('unsplash.com') &&
     content.length >= MIN_COMPLETE_CONTENT_LENGTH &&
     !/we use cookies and data/i.test(content) &&
@@ -204,11 +205,18 @@ export const syncMetadataFeeds = async (options = {}) => {
     let skippedCompleteCount = 0;
     let acceptedCount = 0;
 
-    const validMetadata = articles.filter((article) => (
-      article?.title?.trim().length >= 10 &&
-      isHttpUrl(article.sourceUrl) &&
-      article.sourceName?.trim()
-    ));
+    const requestedLocality = String(city || region || '').trim().toLocaleLowerCase();
+    const validMetadata = articles.filter((article) => {
+      const hasRequiredMetadata = article?.title?.trim().length >= 10 &&
+        isHttpUrl(article.sourceUrl) &&
+        article.sourceName?.trim();
+      if (!hasRequiredMetadata) return false;
+
+      if (!requestedLocality) return true;
+      const searchableText = `${article.title || ''} ${article.summary || ''} ${article.content || ''}`
+        .toLocaleLowerCase();
+      return searchableText.includes(requestedLocality);
+    });
     const titles = validMetadata.map((article) => article.title.trim());
     const sourceUrls = validMetadata.map((article) => article.sourceUrl.trim());
     const existingDocs = titles.length > 0
@@ -240,6 +248,10 @@ export const syncMetadataFeeds = async (options = {}) => {
           const rawImg = typeof article.imageUrl === 'string' ? article.imageUrl.trim() : '';
           const isUnsplash = rawImg.includes('unsplash.com');
           const imageUrl = isUnsplash ? '' : rawImg;
+          const searchableText = `${cleanTitle} ${article.summary || ''} ${article.content || ''}`
+            .toLocaleLowerCase();
+          const articleCity = String(city || article.city || '').trim();
+          const articleRegion = String(region || article.region || '').trim();
 
           docsToInsert.push({
             _id: objectId,
@@ -256,6 +268,12 @@ export const syncMetadataFeeds = async (options = {}) => {
             category: String(article.category || 'general').toLowerCase(),
             subCategory: String(article.subCategory || '').toLowerCase(),
             country: String(article.country || 'all').toLowerCase(),
+            city: articleCity && searchableText.includes(articleCity.toLocaleLowerCase())
+              ? articleCity
+              : '',
+            region: articleRegion && searchableText.includes(articleRegion.toLocaleLowerCase())
+              ? articleRegion
+              : '',
             publishedAt: toValidDate(article.publishedAt) || new Date(),
             status: 'approved',
             isFullContentFetched: false,

@@ -1409,7 +1409,7 @@ export default function LiveBlogStudio() {
                           className="w-full px-4 py-3 bg-black rounded-xl text-white font-mono text-xs border border-gray-700 focus:border-red-500 focus:outline-none shadow-sm"
                         />
                         <p className="text-[11px] text-gray-400 leading-relaxed">
-                          🔥 Pro-Tip: Go live on YouTube (Unlisted or Public) from your phone or streaming software, and paste the live broadcast link here (supports `youtube.com/live/ID` or watch URLs). News Nests natively displays an interactive widescreen player to <strong>lakhs of concurrent viewers</strong> with zero server bandwidth load!
+                          🔥 Pro-Tip: Go live on YouTube (Unlisted or Public) from your phone or streaming software, and paste the live broadcast link here (supports `youtube.com/live/ID` or watch URLs). RitzlaNews displays the live player using the source’s embedded stream.
                         </p>
                         {deskStreamUrl && (
                           <div className="mt-4 pt-4 border-t border-gray-800 space-y-2.5">

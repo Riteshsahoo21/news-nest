@@ -189,7 +189,7 @@ export default function FormattedArticleContent({
                   "{pullQuote}"
                 </blockquote>
                 <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
-                  — {author || 'News Nests Investigation'}
+                  — {author || 'RitzlaNews Investigation'}
                 </p>
               </aside>
             )}

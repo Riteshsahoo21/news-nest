@@ -40,7 +40,7 @@ export default function VideoModal({ videoId, onClose }) {
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareTitle = video ? video.title : 'News Nests Broadcast';
+    const shareTitle = video ? video.title : 'RitzlaNews Broadcast';
     if (navigator.share) {
       try {
         await navigator.share({ title: shareTitle, url: shareUrl });

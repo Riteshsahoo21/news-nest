@@ -42,6 +42,8 @@ const CategoryNews = lazy(() => import('./pages/CategoryNews'));
 const CategoryVideos = lazy(() => import('./pages/CategoryVideos'));
 const Search = lazy(() => import('./pages/Search'));
 const ApplyReporter = lazy(() => import('./pages/ApplyReporter'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -98,6 +100,8 @@ function App({ helmetContext = {} }) {
             <Route path="/editor/dashboard" element={<EditorDashboard />} />
             <Route path="/search" element={<Search />} />
             <Route path="/apply-reporter" element={<ApplyReporter />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
           </Route>
 
           {/* Auth Routes (No Navbar) */}

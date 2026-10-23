@@ -247,7 +247,7 @@ export default function LiveBlogDetailModal({ blogId, isOpen, onClose }) {
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex justify-center items-center p-2 sm:p-4 overflow-hidden animate-fadeIn">
       {blog && (
         <SeoHead
-          title={`${blog.title || 'LIVE Coverage'} - News Nests`}
+          title={`${blog.title || 'LIVE Coverage'} - RitzlaNews`}
           description={blog.description || "Watch active WebRTC journalism broadcast feeds and interactive breaking updates."}
           image={(blog.mainImageUrl && !blog.mainImageUrl.includes('unsplash.com')) ? blog.mainImageUrl : undefined}
           type="website"

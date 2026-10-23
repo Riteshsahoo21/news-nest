@@ -970,7 +970,7 @@ export default function ReporterDashboard() {
                           <p className="text-sm font-bold text-foreground">
                             {videoThumbnail ? videoThumbnail.name : 'Tap to upload high-definition video cover thumbnail'}
                           </p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">Uploaded directly to News Nest Cloudinary servers</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Uploaded directly to RitzlaNews media storage</p>
                         </div>
                       </div>
                     </div>

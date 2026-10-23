@@ -43,7 +43,7 @@ export default function ArticleModal({ articleId, onClose }) {
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareTitle = article ? article.title : 'News Nests Article';
+    const shareTitle = article ? article.title : 'RitzlaNews Article';
     if (navigator.share) {
       try {
         await navigator.share({
@@ -305,7 +305,7 @@ export default function ArticleModal({ articleId, onClose }) {
       "@context": "https://schema.org",
       "@type": "NewsArticle",
       "headline": article.title || "News Report",
-      "description": (article.metaDescription || article.subtitle || article.content || "Read report on News Nests").toString().replace(/<[^>]*>?/gm, '').substring(0, 160),
+      "description": (article.metaDescription || article.subtitle || article.content || "Read report on RitzlaNews").toString().replace(/<[^>]*>?/gm, '').substring(0, 160),
       "image": [article.imageUrl || article.thumbnail || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200"],
       "datePublished": article.createdAt || new Date().toISOString(),
       "dateModified": article.updatedAt || new Date().toISOString(),
@@ -329,7 +329,7 @@ export default function ArticleModal({ articleId, onClose }) {
         >
           {article && (
             <SeoHead 
-              title={`${article.seoTitle || article.title} | News Nests`}
+              title={`${article.seoTitle || article.title} | RitzlaNews`}
               description={article.metaDescription || article.subtitle || article.content}
               image={article.imageUrl || article.thumbnail}
               type="article"

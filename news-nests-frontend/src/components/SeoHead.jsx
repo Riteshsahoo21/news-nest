@@ -7,7 +7,7 @@ import { Helmet } from 'react-helmet-async';
  * Automatically formats Cloudinary image URLs to >= 1200px for Google Discover compliance.
  */
 const SeoHead = ({
-  title = 'News Nests - Real-time News & Live Broadcast Platform',
+  title = 'RitzlaNews - Real-time News & Live Coverage',
   description = 'Read breaking investigative news, participate in real-time interactive live blogs, and watch low-latency WebRTC broadcasts.',
   keywords = 'News, Real-time news, Live Blogs, Politics, Sports, Journalism',
   canonical = window.location.href,
@@ -15,7 +15,7 @@ const SeoHead = ({
   type = 'website',
   publishedTime = '',
   modifiedTime = '',
-  author = 'News Nests Desk',
+  author = 'RitzlaNews Desk',
   schema = null
 }) => {
   // Optimize Cloudinary imagery for Google Discover minimum width (1200px)
@@ -45,7 +45,7 @@ const SeoHead = ({
 
       {/* Open Graph / Facebook / WhatsApp Cards */}
       <meta property="og:type" content={type} />
-      <meta property="og:site_name" content="News Nests" />
+      <meta property="og:site_name" content="RitzlaNews" />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={cleanDescription} />
       <meta property="og:image" content={ogImage} />
@@ -60,7 +60,6 @@ const SeoHead = ({
 
       {/* Twitter / X Large Summary Card */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:site" content="@NewsNests" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={cleanDescription} />
       <meta name="twitter:image" content={ogImage} />

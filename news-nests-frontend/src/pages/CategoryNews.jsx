@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import SafeImage from '../components/common/SafeImage';
@@ -7,19 +7,21 @@ import SafeImage from '../components/common/SafeImage';
 export default function CategoryNews() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Capitalize category name for the header
-  const categoryName = categoryId.charAt(0).toUpperCase() + categoryId.slice(1);
+  const categoryName = (categoryId || 'News').charAt(0).toUpperCase() + (categoryId || 'News').slice(1);
 
   useEffect(() => {
     const fetchCategoryNews = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/news/${categoryId}`);
+        setError('');
+        const res = await api.get(`/news/${encodeURIComponent(categoryId.toLowerCase())}`);
         const fetchedArticles = res.data.data || res.data || [];
         // Show up to 20 articles in the grid
         setArticles(fetchedArticles.slice(0, 20));
@@ -37,11 +39,11 @@ export default function CategoryNews() {
   }, [categoryId, categoryName]);
 
   return (
-    <div className="max-w-7xl mx-auto md:py-6 pb-20 bg-background min-h-screen">
+    <div className="max-w-7xl mx-auto md:py-6 pb-20 bg-background min-h-screen animate-page-enter">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-4 py-4 flex items-center">
         <button 
-          onClick={() => navigate(-1)} 
+          onClick={() => navigate(location.state?.from || '/categories', { viewTransition: true })}
           className="p-1 -ml-1 mr-4 hover:bg-muted rounded-full transition-colors"
           aria-label="Go back"
         >
@@ -78,9 +80,9 @@ export default function CategoryNews() {
                   onClick={() => {
                     const newParams = new URLSearchParams(searchParams);
                     newParams.set('articleId', article.slug || article._id);
-                    setSearchParams(newParams);
+                    setSearchParams(newParams, { viewTransition: true });
                   }}
-                  className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-shadow"
+                  className="flex flex-col bg-card rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-border/50 group hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
                 >
                   {hasMedia && (
                     <div className="relative w-full aspect-[16/10] max-h-[145px] sm:max-h-none bg-muted overflow-hidden shrink-0">

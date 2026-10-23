@@ -114,7 +114,7 @@ export default function Navbar() {
             </svg>
             <div className="flex flex-col justify-center">
               <span className="text-xl sm:text-[28px] font-black leading-none tracking-tight font-sans">
-                <span className="text-[#002169] dark:text-blue-400">News</span><span className="text-[#e60000]">Nest</span>
+                <span className="text-[#002169] dark:text-blue-400">Ritzla</span><span className="text-[#e60000]">News</span>
               </span>
               <span className="hidden sm:block text-[10px] text-gray-700 dark:text-gray-300 font-medium tracking-wide mt-1 leading-none">
                 Your Daily News, Smartly Sorted

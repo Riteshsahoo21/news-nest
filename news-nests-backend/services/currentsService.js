@@ -170,12 +170,15 @@ const KEYWORD_MAP = {
   politics: ['parliament legislative session', 'senate policy bill', 'supreme court ruling', 'government fiscal debate', 'election diplomacy policy']
 };
 
-export const fetchAndSaveCurrentsNews = async () => {
+export const fetchAndSaveCurrentsNews = async ({
+  includeKeywordExpansion = true,
+  maxCandidatesPerCategory = Number.POSITIVE_INFINITY
+} = {}) => {
   try {
     let apiKey = process.env.CURRENTS_API_KEY;
     if (!apiKey) {
       console.warn('Currents API key is missing. Skipping Currents fetch.');
-      return;
+      return { totalInserted: 0, reason: 'missing api key' };
     }
     apiKey = apiKey.trim();
 
@@ -189,22 +192,26 @@ export const fetchAndSaveCurrentsNews = async () => {
         `https://api.currentsapi.services/v1/latest-news?category=${category}&language=en&apiKey=${apiKey}`
       ];
       
-      const keywords = KEYWORD_MAP[category] || [];
-      for (const kw of keywords) {
-        endpoints.push(`https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(kw)}&language=en&apiKey=${apiKey}`);
+      if (includeKeywordExpansion) {
+        const keywords = KEYWORD_MAP[category] || [];
+        for (const kw of keywords) {
+          endpoints.push(`https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(kw)}&language=en&apiKey=${apiKey}`);
+        }
       }
 
       let newCount = 0;
+      let candidateCount = 0;
 
       for (const endpoint of endpoints) {
         try {
-          const response = await axios.get(endpoint);
+          const response = await axios.get(endpoint, { timeout: 12000 });
           const articles = response.data?.news || [];
           let tassCount = 0;
 
           for (let i = 0; i < articles.length; i++) {
             const article = articles[i];
-            if (!article.title) continue;
+            if (!article.title || !article.url) continue;
+            if (candidateCount >= maxCandidatesPerCategory) break;
             const cleanTitle = cleanText(article.title);
             const cleanAuthorText = cleanText(article.author || 'Currents News');
 
@@ -225,6 +232,10 @@ export const fetchAndSaveCurrentsNews = async () => {
 
             const existingArticle = await News.findOne({ title: cleanTitle });
             if (existingArticle) continue;
+            const existingSource = await News.findOne({ sourceUrl: article.url });
+            if (existingSource) continue;
+
+            candidateCount++;
 
             let fullContent = null;
             if (article.url) {
@@ -232,6 +243,10 @@ export const fetchAndSaveCurrentsNews = async () => {
             }
             
             const finalContent = cleanText(fullContent || article.description || cleanTitle);
+
+            if (finalContent.length < 80 || /we use cookies and data|privacytools/i.test(finalContent)) {
+              continue;
+            }
 
             // STRICT CATEGORY & ANOMALY FILTER
             if (isStrictlyMiscategorizedOrOffTopic({ title: cleanTitle, content: finalContent, author: cleanAuthorText }, category)) {
@@ -252,6 +267,16 @@ export const fetchAndSaveCurrentsNews = async () => {
               category: category, 
               author: authorToSave,
               imageUrl: photoUrl,
+              mainImageUrl: photoUrl,
+              mediaUrls: [photoUrl],
+              sourceUrl: article.url,
+              sourceName: cleanAuthorText,
+              publishedAt: article.published && !Number.isNaN(new Date(article.published).getTime())
+                ? new Date(article.published)
+                : new Date(),
+              country: 'global',
+              isFeaturedOnHome: true,
+              isFullContentFetched: finalContent.length >= 350,
               status: 'approved',
               isEditorPick: false,
               isTrending: true, 
@@ -279,8 +304,10 @@ export const fetchAndSaveCurrentsNews = async () => {
     }
 
     console.log(`\n🎉 Successfully inserted a total of ${totalInserted} new articles from Currents API and keyword expansion.`);
+    return { totalInserted };
 
   } catch (error) {
     console.error('Error fetching from Currents API:', error?.response?.data || error.message);
+    return { totalInserted: 0, error: error?.message || 'Currents API request failed' };
   }
 };
