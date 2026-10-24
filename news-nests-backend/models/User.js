@@ -62,6 +62,11 @@ const userSchema = new mongoose.Schema(
       enum: ['local', 'google'],
       default: 'local',
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     roles: {
       type: [String],
       default: ['registered_user'],

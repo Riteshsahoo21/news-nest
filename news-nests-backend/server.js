@@ -72,6 +72,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -102,6 +103,8 @@ io.on('connection', (socket) => {
 // Middleware
 app.use(cors());
 
+// Google Identity Services redirect mode submits application/x-www-form-urlencoded.
+app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use(express.json());
 
 // Attach io to req so controllers can use it

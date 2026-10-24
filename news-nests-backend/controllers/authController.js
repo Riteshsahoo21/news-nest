@@ -2,9 +2,13 @@ import User from '../models/User.js';
 import OTP from '../models/OTP.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getAuth } from 'firebase-admin/auth';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
+import { createHash, randomBytes } from 'node:crypto';
+import GoogleLoginTicket from '../models/GoogleLoginTicket.js';
+
+const googleAuthClient = new OAuth2Client();
 
 const generateToken = (user) => {
   return jwt.sign({ userId: user._id, roles: user.roles || (user.role ? [user.role] : []) }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -175,29 +179,35 @@ export const login = async (req, res) => {
 
 export const googleSignIn = async (req, res) => {
   try {
-    const { idToken } = req.body;
-
-    if (!idToken) {
-      return res.status(400).json({ error: 'Firebase ID token is required' });
+    const credential = req.body?.credential;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!credential || !clientId) {
+      return res.status(400).json({ error: 'Google credential or server Google client ID is missing' });
     }
 
-    // Verify token using Firebase Admin SDK
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const { email, name, picture, uid } = decodedToken;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Google account must have an email associated' });
+    const ticket = await googleAuthClient.verifyIdToken({ idToken: credential, audience: clientId });
+    const payload = ticket.getPayload();
+    const { email, email_verified: emailVerified, name, picture, sub: googleId } = payload || {};
+    if (!email || !emailVerified || !googleId) {
+      return res.status(401).json({ error: 'Use a Google account with a verified email address' });
     }
 
-    let user = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await User.findOne({ googleId });
+    if (!user) user = await User.findOne({ email: normalizedEmail });
 
     if (user && user.isActive === false) {
       return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
     }
 
+    if (user?.googleId && user.googleId !== googleId) {
+      return res.status(409).json({ error: 'This email is already linked to a different Google account' });
+    }
+
     // If user doesn't exist, create them
     if (!user) {
-      let baseUsername = (name || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
+      let baseUsername = (name || normalizedEmail.split('@')[0] || 'user').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24);
+      if (!baseUsername) baseUsername = 'user';
       let username = baseUsername;
       let counter = 1;
       while (await User.findOne({ username })) {
@@ -207,15 +217,46 @@ export const googleSignIn = async (req, res) => {
 
       user = await User.create({
         fullName: name || 'Google User',
-        email,
+        email: normalizedEmail,
         username,
         authProvider: 'google',
+        googleId,
+        ...(picture ? { profilePicture: picture } : {}),
       });
+    } else if (!user.googleId) {
+      // A verified Google email safely links existing Firebase or password accounts.
+      user.googleId = googleId;
+      await user.save();
     }
 
-    const token = generateToken(user);
+    // Use a short-lived, one-time ticket so the app JWT never appears in the redirect URL.
+    const rawTicket = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(rawTicket).digest('hex');
+    await GoogleLoginTicket.create({ tokenHash, userId: user._id, expiresAt: new Date(Date.now() + 2 * 60 * 1000) });
 
-    res.json({
+    const callbackUrl = process.env.GOOGLE_AUTH_SUCCESS_URL || 'https://news.ritzla.in/auth/google/callback';
+    return res.redirect(303, `${callbackUrl}?ticket=${encodeURIComponent(rawTicket)}`);
+  } catch (error) {
+    console.error('Google Sign-In error:', error);
+    res.status(401).json({ error: 'Invalid or expired Google token' });
+  }
+};
+
+export const exchangeGoogleLoginTicket = async (req, res) => {
+  try {
+    const { ticket: rawTicket } = req.body || {};
+    if (typeof rawTicket !== 'string' || rawTicket.length < 32 || rawTicket.length > 128) {
+      return res.status(400).json({ error: 'Invalid or expired Google login ticket' });
+    }
+
+    const tokenHash = createHash('sha256').update(rawTicket).digest('hex');
+    const loginTicket = await GoogleLoginTicket.findOneAndDelete({ tokenHash, expiresAt: { $gt: new Date() } });
+    if (!loginTicket) return res.status(401).json({ error: 'Google login ticket has expired or was already used' });
+
+    const user = await User.findById(loginTicket.userId);
+    if (!user || user.isActive === false) return res.status(403).json({ error: 'This account is unavailable' });
+
+    return res.json({
       message: 'Google Sign-In successful',
       user: {
         _id: user._id,
@@ -226,11 +267,11 @@ export const googleSignIn = async (req, res) => {
         roles: user.roles || (user.role ? [user.role] : []),
         role: user.roles && user.roles.length > 0 ? user.roles[0] : user.role,
       },
-      token,
+      token: generateToken(user),
     });
   } catch (error) {
-    console.error('Google Sign-In error:', error);
-    res.status(401).json({ error: 'Invalid or expired Google token' });
+    console.error('Google login ticket exchange error:', error);
+    return res.status(500).json({ error: 'Unable to complete Google sign-in' });
   }
 };
 

@@ -27,6 +27,7 @@ const Home = lazy(() => import('./pages/Home'));
 const ArticleDetails = lazy(() => import('./pages/ArticleDetails'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const GoogleAuthCallback = lazy(() => import('./pages/GoogleAuthCallback'));
 const LiveBlogs = lazy(() => import('./pages/LiveBlogs'));
 const LiveBlogStudio = lazy(() => import('./pages/LiveBlogStudio'));
 const Videos = lazy(() => import('./pages/Videos'));
@@ -107,6 +108,7 @@ function App({ helmetContext = {} }) {
           {/* Auth Routes (No Navbar) */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']} requiredPermissions={['view_admin_panel']} />}>
