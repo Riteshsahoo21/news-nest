@@ -35,7 +35,7 @@ news-nest/
 ### 2. `news-nests-frontend` (Port 5174)
 - **Framework**: React 19 + Vite (with Node.js SSR support)
 - **Styling**: TailwindCSS & Glassmorphism design tokens
-- **Auth**: Firebase Authentication + Custom JWT
+  - **Auth**: Google OAuth + Custom JWT
 - **Features**:
   - AI Summary Card ("Quick 3-Bullet Takeaway")
   - Historical Backstory Widget ("Why This Matters")

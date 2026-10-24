@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "news:audit": "node scripts/auditScrapedNews.js",
+    "news:backfill-tags": "node scripts/backfillTags.js",
     "news:ensure-indexes": "node scripts/ensureNewsIndexes.js",
     "news:sync-category": "node scripts/syncScrapedCategory.js",
     "news:reset-and-refill": "node scripts/resetAndRefillNews.js",
