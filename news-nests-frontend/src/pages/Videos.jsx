@@ -527,52 +527,62 @@ export default function Videos() {
           {!loading && featuredVideo && activeCategory === 'Trending' && (
             <div className="w-full max-w-full min-w-0">
               <div 
-                className="flex flex-col lg:flex-row rounded-2xl overflow-hidden shadow-md border border-border/60 hover:border-red-500/40 transition-all duration-500 cursor-pointer bg-card group items-stretch transform hover:-translate-y-1"
+                className="grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr] rounded-3xl overflow-hidden shadow-xl shadow-black/10 border border-border/60 hover:border-red-500/40 transition-all duration-500 cursor-pointer bg-card group items-stretch"
                 onClick={() => handleVideoClick(featuredVideo._id)}
               >
-                <div className="relative w-full lg:w-[55%] aspect-[16/9] bg-black shrink-0 overflow-hidden">
+                <div className="relative w-full aspect-[16/9] lg:aspect-auto lg:min-h-[390px] bg-black shrink-0 overflow-hidden">
                   <img 
                     src={featuredVideo.thumbnailUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1280&h=720&fit=crop'} 
                     alt={featuredVideo.title}
-                    className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                    className="absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-[1.04]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 transition-colors group-hover:bg-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/25" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-16 bg-red-600 text-white rounded-full flex items-center justify-center pl-1 shadow-2xl transition-transform duration-300 group-hover:scale-110 group-hover:bg-red-500">
-                      <Play className="w-7 h-7 fill-current" />
+                    <div className="w-[76px] h-[76px] bg-red-600 text-white rounded-full flex items-center justify-center pl-1 shadow-2xl shadow-red-950/40 ring-8 ring-white/15 transition-transform duration-300 group-hover:scale-110 group-hover:bg-red-500">
+                      <Play className="w-8 h-8 fill-current" />
                     </div>
                   </div>
-                  <div className="absolute top-4 left-4 inline-flex items-center bg-red-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider shadow-md font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white mr-2 animate-pulse"></span>
-                    Featured Broadcast
+                  <div className="absolute top-5 left-5 inline-flex items-center gap-2 bg-black/55 backdrop-blur-md text-white text-[10px] font-extrabold px-3 py-2 rounded-full uppercase tracking-[0.16em] border border-white/20 shadow-lg font-mono">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    Editor&apos;s pick
                   </div>
                   {featuredVideo.duration && (
-                    <div className="absolute bottom-4 right-4 bg-black/80 px-2.5 py-1 rounded text-white text-xs font-semibold tracking-wider font-mono">
+                    <div className="absolute bottom-5 right-5 bg-black/75 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-xs font-semibold tracking-wider font-mono border border-white/15">
                       {featuredVideo.duration}
                     </div>
                   )}
+                  <div className="absolute bottom-5 left-5 text-white text-xs font-semibold font-mono drop-shadow-lg">
+                    {formatViews(featuredVideo.views || 0)}
+                  </div>
                 </div>
                 
-                <div className="p-6 sm:p-8 lg:p-10 flex-1 min-w-0 flex flex-col justify-between overflow-hidden">
-                  <div>
-                    <span className="text-xs font-extrabold text-red-600 dark:text-red-500 uppercase tracking-wider block mb-2 font-mono truncate">
-                      {featuredVideo.category || 'GLOBAL NEWS'}
-                    </span>
-                    <h3 className="font-bold font-serif text-xl sm:text-2xl lg:text-[28px] leading-snug text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors mb-4 break-words">
+                <div className="relative p-6 sm:p-8 lg:p-10 xl:p-12 flex-1 min-w-0 flex flex-col justify-center overflow-hidden bg-gradient-to-br from-card via-card to-red-500/[0.06]">
+                  <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-red-500/[0.07] blur-3xl pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                      <span className="w-8 h-[2px] bg-red-600 rounded-full" />
+                      <span className="text-[11px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-[0.2em] font-mono truncate">
+                        {featuredVideo.category || 'Global news'}
+                      </span>
+                    </div>
+                    <h2 className="font-black font-serif text-2xl sm:text-3xl xl:text-[2.65rem] leading-[1.12] text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors mb-5 break-words">
                       {featuredVideo.title}
-                    </h3>
+                    </h2>
                     {featuredVideo.subtitle && (
-                      <p className="text-sm text-muted-foreground mb-6 line-clamp-3 font-sans leading-relaxed break-words">
+                      <p className="text-sm lg:text-base text-muted-foreground mb-7 line-clamp-3 font-sans leading-relaxed break-words max-w-2xl">
                         {featuredVideo.subtitle}
                       </p>
                     )}
                   </div>
-                  <div className="pt-4 border-t border-border/40 text-xs text-muted-foreground font-semibold font-sans flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-foreground">{featuredVideo.reporter || 'Newsroom Desk'}</span>
-                    <span className="opacity-40">•</span>
-                    <span>{formatViews(featuredVideo.views || 0)}</span>
-                    <span className="opacity-40">•</span>
-                    <span>{timeAgo(featuredVideo.createdAt)}</span>
+                  <div className="relative flex flex-wrap items-center justify-between gap-4 mt-auto pt-5 border-t border-border/60">
+                    <div className="flex flex-col gap-1 min-w-0 text-xs font-sans">
+                      <span className="text-foreground font-bold truncate">{featuredVideo.reporter || 'Newsroom Desk'}</span>
+                      <span className="text-muted-foreground">{timeAgo(featuredVideo.createdAt)}</span>
+                    </div>
+                    <span className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg shadow-red-600/20 transition-colors shrink-0">
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      Watch report
+                    </span>
                   </div>
                 </div>
               </div>
